@@ -1,0 +1,154 @@
+/* ─────────────────────────────────────────────────────────
+   LASUConnect — Global Mobile Responsive Styles
+   Import this in main.jsx or App.jsx:
+   import './mobile.css';
+───────────────────────────────────────────────────────── */
+
+/* ── Reset ────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { overflow-x: hidden; }
+img  { max-width: 100%; }
+
+/* ── Scrollbar ────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 4px; }
+
+/* ── Typography scale ─────────────────────────────────── */
+@media (max-width: 480px) {
+  h1 { font-size: 22px !important; }
+  h2 { font-size: 18px !important; }
+  h3 { font-size: 16px !important; }
+}
+
+/* ── AppLayout ────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .sidebar       { display: none !important; }
+  .right-panel   { display: none !important; }
+  .bottom-nav    { display: flex !important; }
+  .mobile-bar    { display: flex !important; }
+  .main-content  { padding: 12px !important; }
+}
+
+/* ── Messages page ────────────────────────────────────── */
+@media (max-width: 767px) {
+  .messages-layout { flex-direction: column !important; }
+  .messages-sidebar {
+    width: 100% !important;
+    height: auto !important;
+    border-right: none !important;
+    border-bottom: 1px solid #F1F5F9 !important;
+  }
+  .messages-chat { flex: 1 !important; }
+}
+
+/* ── Admin dashboard ──────────────────────────────────── */
+@media (max-width: 600px) {
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .admin-stats-grid-3 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .admin-breakdown-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .admin-stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+/* ── Live page ────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .live-stream-layout {
+    flex-direction: column !important;
+    height: auto !important;
+  }
+  .live-chat-panel {
+    width: 100% !important;
+    height: 300px !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+/* ── Course hub header ────────────────────────────────── */
+@media (max-width: 600px) {
+  .hub-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  .hub-header-left {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+  .hub-code {
+    font-size: 20px !important;
+    padding: 6px 12px !important;
+  }
+}
+
+/* ── Profile page ─────────────────────────────────────── */
+@media (max-width: 480px) {
+  .profile-name { font-size: 18px !important; }
+  .profile-stats-row { gap: 2px !important; }
+}
+
+/* ── Post cards ───────────────────────────────────────── */
+@media (max-width: 480px) {
+  .post-card { padding: 12px !important; border-radius: 12px !important; }
+}
+
+/* ── Reels grid on profile ────────────────────────────── */
+@media (max-width: 480px) {
+  .reels-grid { gap: 2px !important; }
+}
+
+/* ── Modals ───────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .modal-container {
+    padding: 8px !important;
+    align-items: flex-end !important;
+  }
+  .modal-content {
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 95vh !important;
+  }
+}
+
+/* ── Announcement cards ───────────────────────────────── */
+@media (max-width: 480px) {
+  .ann-card-actions { flex-wrap: wrap !important; gap: 4px !important; }
+}
+
+/* ── Stream discovery grid ────────────────────────────── */
+@media (max-width: 480px) {
+  .stream-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Trending reels grid ──────────────────────────────── */
+@media (max-width: 400px) {
+  .trending-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── General utilities ────────────────────────────────── */
+.hide-mobile { display: block; }
+.show-mobile { display: none; }
+
+@media (max-width: 767px) {
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: block !important; }
+}
+
+/* Safe area for notched phones */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav {
+    padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+  }
+}
