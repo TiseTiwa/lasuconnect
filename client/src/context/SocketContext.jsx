@@ -1,8 +1,11 @@
-import { createContext, useContext, useEffect, useRef } from 'react';
-import { io } from 'socket.io-client';
-import useAuthStore from './useAuthStore';
+import { createContext, useContext, useEffect, useRef } from "react";
+import { io } from "socket.io-client";
+import useAuthStore from "./useAuthStore";
 
 const SocketContext = createContext(null);
+const socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5000", {
+  withCredentials: true,
+});
 
 export const SocketProvider = ({ children }) => {
   const socketRef = useRef(null);
@@ -12,25 +15,25 @@ export const SocketProvider = ({ children }) => {
     if (!isAuthenticated || !user) return;
 
     // Connect to Socket.IO server
-    socketRef.current = io('/', {
+    socketRef.current = io("/", {
       withCredentials: true,
       autoConnect: true,
     });
 
     const socket = socketRef.current;
 
-    socket.on('connect', () => {
-      console.log('🔌 Socket connected:', socket.id);
+    socket.on("connect", () => {
+      console.log("🔌 Socket connected:", socket.id);
       // Tell the server which user this socket belongs to
-      socket.emit('user:join', user._id);
+      socket.emit("user:join", user._id);
     });
 
-    socket.on('disconnect', () => {
-      console.log('❌ Socket disconnected');
+    socket.on("disconnect", () => {
+      console.log("❌ Socket disconnected");
     });
 
-    socket.on('connect_error', (err) => {
-      console.error('Socket connection error:', err.message);
+    socket.on("connect_error", (err) => {
+      console.error("Socket connection error:", err.message);
     });
 
     // Cleanup on unmount or when user changes

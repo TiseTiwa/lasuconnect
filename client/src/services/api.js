@@ -5,11 +5,8 @@ import axios from 'axios';
 //  All API calls should use this instance, not raw axios.
 // ─────────────────────────────────────────────────────────
 const api = axios.create({
-  baseURL: '/api',         // Vite proxy routes this to http://localhost:5000/api
-  withCredentials: true,   // Send HTTP-only cookies (refresh token)
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  withCredentials: true,
 });
 
 // ── Request Interceptor — attach JWT access token ─────────
