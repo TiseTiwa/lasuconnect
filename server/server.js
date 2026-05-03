@@ -33,6 +33,8 @@ const liveRoutes = require("./modules/live/live.routes");
 const notificationRoutes = require("./modules/notifications/notifications.routes");
 const adminRoutes = require("./modules/admin/admin.routes");
 const mediaRoutes = require("./modules/media/media.routes");
+const handbookRoutes = require('./modules/handbook/handbook.routes');
+const quizRoutes     = require('./modules/quiz/quiz.routes');
 
 // ── App + HTTP server ─────────────────────────────────────
 const app = express();
@@ -131,6 +133,8 @@ app.use("/api/live", liveRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/media", mediaRoutes);
+app.use("/api/handbook", handbookRoutes);
+app.use("/api/quiz", quizRoutes);
 
 // ── Error handlers (must be last) ────────────────────────
 app.use(notFound);

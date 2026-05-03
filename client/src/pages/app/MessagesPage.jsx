@@ -659,10 +659,8 @@ const MessagesPage = () => {
     : conversations;
 
   return (
-    <div style={s.page}>
+    <div style={{ ...s.page, height: isMobile ? 'calc(100svh - 80px)' : 'calc(100vh - 80px)' }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; }
         textarea { resize: none; }
         textarea:focus, input:focus { outline: none; }
         @keyframes spin { to { transform: rotate(360deg); } }

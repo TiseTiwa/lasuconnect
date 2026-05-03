@@ -64,6 +64,7 @@ const userSchema = new mongoose.Schema(
     // ── Social ────────────────────────────────────────
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    savedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Post' }],
 
     // ── Verification ──────────────────────────────────
     isVerified:        { type: Boolean, default: false },

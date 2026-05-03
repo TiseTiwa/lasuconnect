@@ -1,13 +1,12 @@
 import useUpload from "../../hooks/useUpload";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom"; // ← Fix 1: added import
+import { useNavigate } from "react-router-dom";
 import useAuthStore from "../../context/useAuthStore";
+import { useTheme } from "../../context/ThemeContext";
+import useIsMobile from "../../hooks/useIsMobile";
+import { FeedGate, StreakWidget } from "../../components/AcademicComponents";
 import {
-  getFeed,
-  createPost,
-  toggleLike,
-  getComments,
-  addComment,
+  getFeed, createPost, toggleLike, getComments, addComment,
 } from "../../services/postsService";
 
 // ── Time formatter ─────────────────────────────────────────
@@ -376,15 +375,21 @@ const cs = {
 
 // ── Main Feed Page ─────────────────────────────────────────
 const FeedPage = () => {
-  const { user }  = useAuthStore();
+  const { user }          = useAuthStore();
+  const { mode, setMode } = useTheme();
+  const isMobile          = useIsMobile();
+
   const [posts, setPosts]             = useState([]);
-  const [feedType, setFeedType]       = useState("all");
   const [page, setPage]               = useState(1);
   const [hasMore, setHasMore]         = useState(true);
   const [loading, setLoading]         = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError]             = useState("");
   const loaderRef = useRef(null);
+
+  // feedType is derived from mode so both toggles stay in sync
+  const feedType    = mode === "academic" ? "academic" : "social";
+  const setFeedType = (val) => setMode(val === "academic" ? "academic" : "social");
 
   const loadPosts = useCallback(async (pageNum = 1, type = feedType, reset = false) => {
     if (pageNum === 1) setLoading(true); else setLoadingMore(true);
@@ -417,10 +422,8 @@ const FeedPage = () => {
   const handleNewPost = (post) => setPosts((p) => [post, ...p]);
 
   return (
-    <div style={s.page}>
+    <div style={{ ...s.page, paddingBottom: isMobile ? 96 : 40 }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; }
         textarea { resize: none; }
         textarea:focus, input:focus, select:focus { outline: none; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -429,18 +432,26 @@ const FeedPage = () => {
         .post-item { animation: slideUp 0.25s ease forwards; }
       `}</style>
 
-      <div style={s.pageHeader}>
-        <h1 style={s.pageTitle}>Feed</h1>
-        <span style={s.pageSubtitle}>What's happening on campus 🔥</span>
+      <div style={{ ...s.pageHeader, marginBottom: isMobile ? 14 : 20, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h1 style={{ ...s.pageTitle, fontSize: isMobile ? "22px" : "26px" }}>Feed</h1>
+          <span style={s.pageSubtitle}>What's happening on campus</span>
+        </div>
+        <StreakWidget compact />
       </div>
 
       <PostComposer user={user} onPost={handleNewPost} />
 
       <div style={s.toggle}>
-        {[["all", "🌐 All"], ["social", "😄 Social"], ["academic", "🎓 Academic"]].map(([val, label]) => (
+        {[["social", "🌐 Social"], ["academic", "🎓 Academic"]].map(([val, label]) => (
           <button key={val} onClick={() => setFeedType(val)}
-            style={{ ...s.toggleBtn, ...(feedType === val ? s.toggleActive : {}) }}>
-            {label}
+            style={{
+              ...s.toggleBtn,
+              ...(feedType === val ? s.toggleActive : {}),
+              fontSize: isMobile ? "12px" : "13px",
+              padding: isMobile ? "8px 4px" : "8px",
+            }}>
+            {isMobile ? label.split(" ")[0] + " " + label.split(" ")[1] : label}
           </button>
         ))}
       </div>
@@ -471,32 +482,34 @@ const FeedPage = () => {
       )}
 
       {!loading && (
-        <div style={s.posts}>
-          {posts.length === 0 ? (
-            <div style={s.emptyState}>
-              <div style={s.emptyIcon}>📭</div>
-              <h3 style={s.emptyTitle}>No posts yet</h3>
-              <p style={s.emptyText}>
-                {feedType === "academic"
-                  ? "No academic posts yet. Share your study tips or course notes!"
-                  : "Be the first to post! Share what's happening on campus."}
-              </p>
-            </div>
-          ) : (
-            posts.map((post, i) => (
-              <div key={post._id} className="post-item" style={{ animationDelay: `${Math.min(i, 5) * 0.06}s` }}>
-                <PostCard post={post} currentUserId={user?._id} />
+        <FeedGate feedType={feedType}>
+          <div style={s.posts}>
+            {posts.length === 0 ? (
+              <div style={s.emptyState}>
+                <div style={s.emptyIcon}>📭</div>
+                <h3 style={s.emptyTitle}>No posts yet</h3>
+                <p style={s.emptyText}>
+                  {feedType === "academic"
+                    ? "No academic posts yet. Share your study tips or course notes!"
+                    : "Be the first to post! Share what's happening on campus."}
+                </p>
               </div>
-            ))
-          )}
-          <div ref={loaderRef} style={{ height: "20px" }} />
-          {loadingMore && (
-            <div style={s.loadMoreSpinner}><div style={s.spinner} /></div>
-          )}
-          {!hasMore && posts.length > 0 && (
-            <div style={s.endText}>You're all caught up! 🎉</div>
-          )}
-        </div>
+            ) : (
+              posts.map((post, i) => (
+                <div key={post._id} className="post-item" style={{ animationDelay: `${Math.min(i, 5) * 0.06}s` }}>
+                  <PostCard post={post} currentUserId={user?._id} />
+                </div>
+              ))
+            )}
+            <div ref={loaderRef} style={{ height: "20px" }} />
+            {loadingMore && (
+              <div style={s.loadMoreSpinner}><div style={s.spinner} /></div>
+            )}
+            {!hasMore && posts.length > 0 && (
+              <div style={s.endText}>You're all caught up! 🎉</div>
+            )}
+          </div>
+        </FeedGate>
       )}
     </div>
   );
@@ -504,48 +517,50 @@ const FeedPage = () => {
 
 // ─── Styles ────────────────────────────────────────────────
 const s = {
-  page:           { paddingBottom: "80px", fontFamily: "'DM Sans', sans-serif" },
+  page:           { paddingBottom: "80px", fontFamily: "var(--font-body)" },
   pageHeader:     { marginBottom: "20px" },
-  pageTitle:      { fontFamily: "'Geist', sans-serif", fontWeight: 800, fontSize: "26px", color: "#0F172A", lineHeight: 1.1 },
-  pageSubtitle:   { fontSize: "14px", color: "#64748B", marginTop: "4px", display: "block" },
-  toggle:         { display: "flex", gap: "6px", marginBottom: "16px", background: "white", padding: "6px", borderRadius: "12px", border: "1px solid #E2E8F0" },
-  toggleBtn:      { flex: 1, padding: "8px", borderRadius: "8px", border: "none", background: "transparent", fontSize: "13px", fontWeight: 600, color: "#64748B", cursor: "pointer", transition: "all 0.15s", fontFamily: "'DM Sans', sans-serif" },
-  toggleActive:   { background: "#EFF6FF", color: "#2563EB" },
-  posts:          { display: "flex", flexDirection: "column", gap: "12px" },
-  postCard:       { background: "white", borderRadius: "16px", padding: "16px", border: "1px solid #E2E8F0", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" },
-  pinnedBadge:    { fontSize: "11px", color: "#D97706", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: "20px", padding: "2px 10px", display: "inline-block", marginBottom: "10px", fontWeight: 600 },
+  pageTitle:      { fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "26px", color: "var(--text-primary)", lineHeight: 1.1, margin: 0 },
+  pageSubtitle:   { fontSize: "14px", color: "var(--text-tertiary)", marginTop: "4px", display: "block" },
+  toggle:         { display: "flex", gap: "4px", marginBottom: "14px", background: "var(--bg-surface)", padding: "5px", borderRadius: "var(--radius-md)", border: "0.5px solid var(--border)" },
+  toggleBtn:      { flex: 1, padding: "8px", borderRadius: "var(--radius-sm)", border: "none", background: "transparent", fontSize: "13px", fontWeight: 600, color: "var(--text-tertiary)", cursor: "pointer", transition: "all var(--duration-fast) var(--ease-out)", fontFamily: "var(--font-body)" },
+  toggleActive:   { background: "var(--brand-light)", color: "var(--brand)" },
+  posts:          { display: "flex", flexDirection: "column", gap: "10px" },
+  postCard:       { background: "var(--bg-surface)", borderRadius: "var(--radius-lg)", padding: "16px", border: "0.5px solid var(--border)", boxShadow: "var(--shadow-1)" },
+  pinnedBadge:    { fontSize: "11px", color: "var(--reward-mid)", background: "var(--reward-light)", border: "0.5px solid var(--border)", borderRadius: "var(--radius-full)", padding: "2px 10px", display: "inline-block", marginBottom: "10px", fontWeight: 600 },
   postHeader:     { display: "flex", gap: "10px", alignItems: "flex-start", marginBottom: "10px" },
   postAuthorRow:  { display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" },
-  postAuthorName: { fontFamily: "'Geist', sans-serif", fontWeight: 700, fontSize: "14px", color: "#0F172A" },
-  academicBadge:  { fontSize: "11px", background: "#EFF6FF", color: "#2563EB", padding: "2px 8px", borderRadius: "20px", fontWeight: 600 },
-  postMeta:       { fontSize: "12px", color: "#94A3B8", marginTop: "2px" },
-  postContent:    { fontSize: "14.5px", color: "#1E293B", lineHeight: 1.65, marginBottom: "10px", whiteSpace: "pre-wrap" },
+  postAuthorName: { fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "14px", color: "var(--text-primary)", cursor: "pointer" },
+  academicBadge:  { fontSize: "11px", background: "var(--brand-light)", color: "var(--brand)", padding: "2px 8px", borderRadius: "var(--radius-full)", fontWeight: 600 },
+  socialBadge:    { fontSize: "11px", background: "var(--bg-elevated)", color: "var(--text-secondary)", padding: "2px 8px", borderRadius: "var(--radius-full)", fontWeight: 600 },
+  postMeta:       { fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px" },
+  postContent:    { fontSize: "14.5px", color: "var(--text-secondary)", lineHeight: 1.65, marginBottom: "10px", whiteSpace: "pre-wrap", cursor: "pointer" },
   tagRow:         { display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" },
-  tag:            { fontSize: "12px", color: "#2563EB", background: "#EFF6FF", padding: "2px 8px", borderRadius: "20px", fontWeight: 600, cursor: "pointer" },
-  postActions:    { display: "flex", gap: "4px", paddingTop: "10px", borderTop: "1px solid #F1F5F9" },
-  actionBtn:      { display: "flex", alignItems: "center", gap: "5px", padding: "6px 10px", borderRadius: "8px", border: "none", background: "transparent", fontSize: "13px", fontWeight: 600, color: "#64748B", cursor: "pointer", transition: "all 0.15s", fontFamily: "'DM Sans', sans-serif" },
-  commentsSection:{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #F1F5F9", display: "flex", flexDirection: "column", gap: "10px" },
+  tag:            { fontSize: "12px", color: "var(--brand)", background: "var(--brand-light)", padding: "2px 8px", borderRadius: "var(--radius-full)", fontWeight: 600, cursor: "pointer" },
+  postStats:      { fontSize: "12px", color: "var(--text-tertiary)", display: "flex", gap: "12px", marginBottom: "6px" },
+  postActions:    { display: "flex", gap: "2px", paddingTop: "8px", borderTop: "0.5px solid var(--border)" },
+  actionBtn:      { display: "flex", alignItems: "center", gap: "5px", padding: "6px 8px", borderRadius: "var(--radius-sm)", border: "none", background: "transparent", fontSize: "13px", fontWeight: 600, color: "var(--text-tertiary)", cursor: "pointer", transition: "all var(--duration-fast)", fontFamily: "var(--font-body)" },
+  likedBtn:       { background: "var(--error-light)", color: "var(--error)" },
+  commentsSection:{ marginTop: "12px", paddingTop: "12px", borderTop: "0.5px solid var(--border)", display: "flex", flexDirection: "column", gap: "10px" },
   commentItem:    { display: "flex", gap: "8px", alignItems: "flex-start" },
-  commentBubble:  { background: "#F8FAFC", borderRadius: "12px", padding: "8px 12px", flex: 1, display: "flex", flexDirection: "column", gap: "2px" },
-  commentAuthor:  { fontFamily: "'Geist', sans-serif", fontWeight: 700, fontSize: "12px", color: "#0F172A" },
-  commentText:    { fontSize: "13px", color: "#374151", lineHeight: 1.5 },
-  commentTime:    { fontSize: "11px", color: "#94A3B8" },
+  commentBubble:  { background: "var(--bg-elevated)", borderRadius: "0 var(--radius-md) var(--radius-md) var(--radius-md)", padding: "8px 12px", flex: 1 },
+  commentAuthor:  { fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "12px", color: "var(--text-primary)" },
+  commentText:    { fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5 },
+  commentTime:    { fontSize: "11px", color: "var(--text-tertiary)" },
   commentForm:    { display: "flex", gap: "8px", alignItems: "center" },
-  commentInput:   { flex: 1, padding: "8px 14px", border: "1.5px solid #E2E8F0", borderRadius: "20px", fontSize: "13px", background: "#F8FAFC", color: "#0F172A", fontFamily: "'DM Sans', sans-serif" },
-  commentSubmit:  { width: "34px", height: "34px", borderRadius: "50%", background: "#2563EB", color: "white", border: "none", fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  loadingText:    { fontSize: "13px", color: "#94A3B8", textAlign: "center", padding: "8px" },
-  errorBox:       { background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: "12px", padding: "12px 16px", fontSize: "13px", color: "#DC2626", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" },
-  retryBtn:       { background: "#DC2626", color: "white", border: "none", borderRadius: "6px", padding: "4px 12px", fontSize: "12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" },
+  commentInput:   { flex: 1, padding: "8px 14px", border: "1.5px solid var(--border-sec)", borderRadius: "var(--radius-full)", fontSize: "13px", background: "var(--bg-input)", color: "var(--text-primary)", fontFamily: "var(--font-body)" },
+  commentSubmit:  { width: "34px", height: "34px", borderRadius: "50%", background: "var(--brand)", color: "var(--text-inverse)", border: "none", fontSize: "16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  errorBox:       { background: "var(--error-light)", border: "0.5px solid var(--error)", borderRadius: "var(--radius-md)", padding: "12px 16px", fontSize: "13px", color: "var(--error)", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" },
+  retryBtn:       { background: "var(--error)", color: "white", border: "none", borderRadius: "var(--radius-sm)", padding: "4px 12px", fontSize: "12px", cursor: "pointer", fontFamily: "var(--font-body)" },
   emptyState:     { textAlign: "center", padding: "60px 20px" },
   emptyIcon:      { fontSize: "48px", marginBottom: "16px" },
-  emptyTitle:     { fontFamily: "'Geist', sans-serif", fontWeight: 700, fontSize: "18px", color: "#0F172A", marginBottom: "8px" },
-  emptyText:      { fontSize: "14px", color: "#64748B", lineHeight: 1.6 },
+  emptyTitle:     { fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "18px", color: "var(--text-primary)", marginBottom: "8px" },
+  emptyText:      { fontSize: "14px", color: "var(--text-tertiary)", lineHeight: 1.6 },
   skeletonHeader: { display: "flex", gap: "12px", alignItems: "center" },
-  skeletonCircle: { width: "42px", height: "42px", borderRadius: "50%", background: "#E2E8F0", flexShrink: 0 },
-  skeletonLine:   { height: "14px", background: "#E2E8F0", borderRadius: "6px" },
+  skeletonCircle: { width: "42px", height: "42px", borderRadius: "50%", background: "var(--border)", flexShrink: 0 },
+  skeletonLine:   { height: "14px", background: "var(--border)", borderRadius: "var(--radius-sm)" },
   loadMoreSpinner:{ display: "flex", justifyContent: "center", padding: "20px" },
-  spinner:        { width: "24px", height: "24px", border: "3px solid #E2E8F0", borderTopColor: "#2563EB", borderRadius: "50%", animation: "spin 0.7s linear infinite" },
-  endText:        { textAlign: "center", fontSize: "13px", color: "#94A3B8", padding: "20px", fontWeight: 600 },
+  spinner:        { width: "24px", height: "24px", border: "3px solid var(--border)", borderTopColor: "var(--brand)", borderRadius: "50%", animation: "spin 0.7s linear infinite" },
+  endText:        { textAlign: "center", fontSize: "13px", color: "var(--text-tertiary)", padding: "20px", fontWeight: 600 },
 };
 
 export default FeedPage;

@@ -1,154 +1,179 @@
-/* ─────────────────────────────────────────────────────────
-   LASUConnect — Global Mobile Responsive Styles
-   Import this in main.jsx or App.jsx:
-   import './mobile.css';
-───────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   LASUConnect — Global Responsive Stylesheet
+   Import in main.jsx after theme.css:  import './mobile.css'
+   NOTE: Bottom nav / sidebar / header visibility is handled
+   entirely inside AppLayout's own <style> block — do NOT
+   duplicate those rules here.
+═══════════════════════════════════════════════════════════ */
 
-/* ── Reset ────────────────────────────────────────────── */
+/* ── Base resets ─────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-body { overflow-x: hidden; }
-img  { max-width: 100%; }
+img, video             { max-width: 100%; height: auto; display: block; }
+html, body             { overflow-x: hidden; max-width: 100vw; }
 
-/* ── Scrollbar ────────────────────────────────────────── */
-::-webkit-scrollbar       { width: 4px; height: 4px; }
-::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 4px; }
+/* ── Utility ─────────────────────────────────────────────── */
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.scroll-x::-webkit-scrollbar { display: none; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clamp-2  { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.clamp-3  { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* ── Typography scale ─────────────────────────────────── */
-@media (max-width: 480px) {
-  h1 { font-size: 22px !important; }
-  h2 { font-size: 18px !important; }
-  h3 { font-size: 16px !important; }
-}
-
-/* ── AppLayout ────────────────────────────────────────── */
-@media (max-width: 900px) {
-  .sidebar       { display: none !important; }
-  .right-panel   { display: none !important; }
-  .bottom-nav    { display: flex !important; }
-  .mobile-bar    { display: flex !important; }
-  .main-content  { padding: 12px !important; }
-}
-
-/* ── Messages page ────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   MOBILE  ≤ 767px
+═══════════════════════════════════════════════════════════ */
 @media (max-width: 767px) {
-  .messages-layout { flex-direction: column !important; }
-  .messages-sidebar {
-    width: 100% !important;
-    height: auto !important;
-    border-right: none !important;
-    border-bottom: 1px solid #F1F5F9 !important;
+
+  /* ── Inputs: prevent iOS auto-zoom (must be ≥ 16px) ── */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="search"],
+  textarea,
+  select {
+    font-size: 16px !important;
   }
-  .messages-chat { flex: 1 !important; }
+
+  /* ── Touch targets ── */
+  button, a[role="button"] { min-height: 36px; }
+  .lc-btn--icon { min-height: 36px !important; min-width: 36px !important; }
+
+  /* ── Cards ── */
+  .lc-card         { border-radius: 12px !important; padding: 12px !important; }
+  .lc-modal        { border-radius: 20px 20px 0 0 !important; max-width: 100% !important; max-height: 92svh !important; }
+  .lc-overlay      { align-items: flex-end !important; padding: 0 !important; }
+
+  /* ─────────────────────────────────────────────────────
+     PROFILE PAGE
+  ───────────────────────────────────────────────────── */
+  .profile-cover    { height: 130px !important; }
+  .profile-body     { padding: 0 12px 16px !important; border-radius: 0 0 14px 14px !important; }
+  .profile-avatar-wrap { margin-top: -38px !important; }
+  .profile-avatar-wrap img,
+  .profile-avatar-wrap > div { width: 72px !important; height: 72px !important; font-size: 22px !important; }
+  .profile-action-row { flex-wrap: wrap; gap: 6px !important; margin-top: 40px !important; }
+  .profile-name     { font-size: 18px !important; }
+  .profile-stats-num  { font-size: 17px !important; }
+  .profile-stats-label { font-size: 10px !important; }
+  .profile-tabs     { overflow-x: auto; flex-wrap: nowrap !important; scrollbar-width: none; }
+  .profile-tabs::-webkit-scrollbar { display: none; }
+  .profile-tab      { flex-shrink: 0 !important; padding: 8px 12px !important; font-size: 12px !important; }
+  .profile-grid     { grid-template-columns: repeat(3, 1fr) !important; gap: 2px !important; }
+
+  /* ─────────────────────────────────────────────────────
+     FEED PAGE
+  ───────────────────────────────────────────────────── */
+  .feed-toggle button    { font-size: 12px !important; padding: 7px 4px !important; }
+  .post-action-btn       { padding: 5px 6px !important; font-size: 11px !important; }
+  .media-grid            { gap: 2px !important; border-radius: 10px !important; }
+  .composer-actions      { flex-wrap: wrap; gap: 6px !important; }
+
+  /* ─────────────────────────────────────────────────────
+     NOTIFICATIONS PAGE
+  ───────────────────────────────────────────────────── */
+  .notif-item        { padding: 10px 12px !important; gap: 10px !important; }
+  .notif-group-label { font-size: 11px !important; padding: 5px 12px !important; }
+  .notif-content     { font-size: 13px !important; line-height: 1.4 !important; }
+  .notif-time        { font-size: 10px !important; }
+
+  /* ─────────────────────────────────────────────────────
+     POST DETAIL
+  ───────────────────────────────────────────────────── */
+  .post-detail-media   { margin: 0 -12px !important; width: calc(100% + 24px) !important; border-radius: 0 !important; }
+  .post-detail-content { font-size: 14px !important; line-height: 1.6 !important; }
+  .comment-bubble      { padding: 8px 10px !important; font-size: 13px !important; }
+  .comment-input-row   { gap: 6px !important; padding: 10px 12px !important; }
+
+  /* ─────────────────────────────────────────────────────
+     ANNOUNCEMENTS
+  ───────────────────────────────────────────────────── */
+  .ann-card      { padding: 12px !important; }
+  .ann-meta      { flex-wrap: wrap; gap: 4px !important; }
+  .ann-filters   { overflow-x: auto; flex-wrap: nowrap !important; scrollbar-width: none; padding-bottom: 4px; }
+  .ann-filters::-webkit-scrollbar { display: none; }
+  .ann-filter-btn { flex-shrink: 0 !important; font-size: 11px !important; }
+
+  /* ─────────────────────────────────────────────────────
+     REELS
+  ───────────────────────────────────────────────────── */
+  .reels-wrap        { height: 100svh !important; }
+  .reel-actions-col  { right: 8px !important; bottom: 100px !important; gap: 14px !important; }
+  .reel-info-box     { bottom: 90px !important; left: 12px !important; right: 64px !important; }
+  .reel-info-box h3  { font-size: 14px !important; }
+  .reel-info-box p   { font-size: 12px !important; }
+
+  /* ─────────────────────────────────────────────────────
+     MESSAGES
+  ───────────────────────────────────────────────────── */
+  .msg-layout    { flex-direction: column !important; }
+  .msg-sidebar   { width: 100% !important; border-right: none !important; border-bottom: 0.5px solid var(--border) !important; }
+  .msg-chat      { width: 100% !important; }
+  .msg-input-row { padding: 8px !important; gap: 6px !important; }
+
+  /* ─────────────────────────────────────────────────────
+     COURSES
+  ───────────────────────────────────────────────────── */
+  .courses-grid  { grid-template-columns: 1fr !important; gap: 10px !important; }
+  .hub-header    { flex-direction: column !important; gap: 10px !important; }
+  .hub-code      { font-size: 18px !important; padding: 5px 10px !important; }
+  .course-tabs   { overflow-x: auto; flex-wrap: nowrap !important; scrollbar-width: none; }
+  .course-tabs::-webkit-scrollbar { display: none; }
+
+  /* ─────────────────────────────────────────────────────
+     LIVE
+  ───────────────────────────────────────────────────── */
+  .live-layout      { flex-direction: column !important; height: auto !important; }
+  .live-video       { width: 100% !important; min-height: 220px !important; }
+  .live-chat        { width: 100% !important; height: 250px !important; border-left: none !important; border-top: 0.5px solid var(--border) !important; }
+  .live-discovery   { grid-template-columns: 1fr !important; }
+
+  /* ─────────────────────────────────────────────────────
+     ADMIN
+  ───────────────────────────────────────────────────── */
+  .admin-stats   { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+  .admin-table   { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .admin-table table { min-width: 500px; font-size: 12px !important; }
+
+  /* ─────────────────────────────────────────────────────
+     HANDBOOK
+  ───────────────────────────────────────────────────── */
+  .hb-dropzone   { padding: 20px 14px !important; }
+  .hb-row        { padding: 9px 10px !important; gap: 8px !important; }
+  .hb-code       { font-size: 11px !important; min-width: 54px !important; width: 54px !important; }
+  .hb-title      { font-size: 12px !important; }
+  .hb-filters    { flex-wrap: wrap; gap: 4px !important; }
+
+  /* ─────────────────────────────────────────────────────
+     SEARCH
+  ───────────────────────────────────────────────────── */
+  .search-grid   { grid-template-columns: 1fr !important; }
+  .search-tabs   { overflow-x: auto; flex-wrap: nowrap !important; scrollbar-width: none; }
+  .search-tabs::-webkit-scrollbar { display: none; }
+  .search-tab    { flex-shrink: 0 !important; font-size: 12px !important; }
+
+  /* ─────────────────────────────────────────────────────
+     QUIZ MODAL
+  ───────────────────────────────────────────────────── */
+  .quiz-overlay  { align-items: flex-end !important; padding: 0 !important; }
+  .quiz-modal    { border-radius: 20px 20px 0 0 !important; max-height: 92svh !important; }
+  .quiz-option   { padding: 11px 12px !important; font-size: 13px !important; }
+  .quiz-q-text   { font-size: 15px !important; }
 }
 
-/* ── Admin dashboard ──────────────────────────────────── */
-@media (max-width: 600px) {
-  .admin-stats-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-  .admin-stats-grid-3 {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-  .admin-breakdown-grid {
-    grid-template-columns: 1fr !important;
-  }
+/* ═══════════════════════════════════════════════════════════
+   TABLET  768px – 1100px
+═══════════════════════════════════════════════════════════ */
+@media (min-width: 768px) and (max-width: 1100px) {
+  .admin-stats  { grid-template-columns: repeat(3, 1fr) !important; }
+  .courses-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .profile-grid { grid-template-columns: repeat(3, 1fr) !important; }
+  .search-grid  { grid-template-columns: repeat(2, 1fr) !important; }
 }
 
-@media (max-width: 380px) {
-  .admin-stats-grid {
-    grid-template-columns: 1fr 1fr !important;
-  }
-}
-
-/* ── Live page ────────────────────────────────────────── */
-@media (max-width: 767px) {
-  .live-stream-layout {
-    flex-direction: column !important;
-    height: auto !important;
-  }
-  .live-chat-panel {
-    width: 100% !important;
-    height: 300px !important;
-    flex-shrink: 0 !important;
-  }
-}
-
-/* ── Course hub header ────────────────────────────────── */
-@media (max-width: 600px) {
-  .hub-header {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-  }
-  .hub-header-left {
-    flex-direction: column !important;
-    gap: 10px !important;
-  }
-  .hub-code {
-    font-size: 20px !important;
-    padding: 6px 12px !important;
-  }
-}
-
-/* ── Profile page ─────────────────────────────────────── */
-@media (max-width: 480px) {
-  .profile-name { font-size: 18px !important; }
-  .profile-stats-row { gap: 2px !important; }
-}
-
-/* ── Post cards ───────────────────────────────────────── */
-@media (max-width: 480px) {
-  .post-card { padding: 12px !important; border-radius: 12px !important; }
-}
-
-/* ── Reels grid on profile ────────────────────────────── */
-@media (max-width: 480px) {
-  .reels-grid { gap: 2px !important; }
-}
-
-/* ── Modals ───────────────────────────────────────────── */
-@media (max-width: 480px) {
-  .modal-container {
-    padding: 8px !important;
-    align-items: flex-end !important;
-  }
-  .modal-content {
-    border-radius: 20px 20px 0 0 !important;
-    max-height: 95vh !important;
-  }
-}
-
-/* ── Announcement cards ───────────────────────────────── */
-@media (max-width: 480px) {
-  .ann-card-actions { flex-wrap: wrap !important; gap: 4px !important; }
-}
-
-/* ── Stream discovery grid ────────────────────────────── */
-@media (max-width: 480px) {
-  .stream-grid {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-/* ── Trending reels grid ──────────────────────────────── */
-@media (max-width: 400px) {
-  .trending-grid {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-/* ── General utilities ────────────────────────────────── */
-.hide-mobile { display: block; }
-.show-mobile { display: none; }
-
-@media (max-width: 767px) {
-  .hide-mobile { display: none !important; }
-  .show-mobile { display: block !important; }
-}
-
-/* Safe area for notched phones */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .bottom-nav {
-    padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+/* ── Reduced motion ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -310,7 +310,7 @@ const AdminDashboard = () => {
   ];
 
   return (
-    <div style={s.page}>
+    <div style={{ ...s.page, paddingBottom: isMobile ? 96 : 40 }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; }
@@ -555,7 +555,7 @@ const AdminDashboard = () => {
 
 // ─── Styles ───────────────────────────────────────────────
 const s = {
-  page:      { paddingBottom: 80, fontFamily: "'DM Sans', sans-serif" },
+  page:      { paddingBottom: 'var(--page-pb, 40px)', fontFamily: "'DM Sans', sans-serif" },
   pageTitle: { fontFamily: 'Geist, sans-serif', fontWeight: 800, fontSize: 26, color: '#0F172A', margin: 0 },
   backBtn:   { padding: '8px 16px', borderRadius: 10, border: '1.5px solid #E2E8F0', background: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151', fontFamily: "'DM Sans', sans-serif" },
 

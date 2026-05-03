@@ -625,6 +625,7 @@ const LivePage = () => {
   const { user }  = useAuthStore();
   const socket    = useSocket();
   const navigate  = useNavigate();
+  const isMobile  = useIsMobile();
 
   const [streams, setStreams]         = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -712,10 +713,8 @@ const LivePage = () => {
 
   // ── Discovery View ───────────────────────────────────────
   return (
-    <div style={{ paddingBottom: 80, fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ paddingBottom: isMobile ? 96 : 40, fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; }
         input:focus, select:focus, textarea:focus { outline: none; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
@@ -723,9 +722,9 @@ const LivePage = () => {
       `}</style>
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: isMobile ? 14 : 20 }}>
         <div>
-          <h1 style={{ fontFamily: 'Geist, sans-serif', fontWeight: 800, fontSize: 26, color: '#0F172A', margin: 0 }}>
+          <h1 style={{ fontFamily: 'Geist, sans-serif', fontWeight: 800, fontSize: isMobile ? 22 : 26, color: '#0F172A', margin: 0 }}>
             🔴 Live
           </h1>
           <p style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>Watch and host live sessions on campus</p>
@@ -779,7 +778,7 @@ const LivePage = () => {
             </button>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(240px, 1fr))', gap: isMobile ? 10 : 16 }}>
             {streams.map(stream => (
               <StreamCard key={stream._id} stream={stream} onJoin={handleJoinStream} />
             ))}

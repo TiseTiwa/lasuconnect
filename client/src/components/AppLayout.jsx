@@ -1,827 +1,432 @@
 import { useState, useEffect } from "react";
-import { NavLink, useNavigate, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import useAuthStore from "../context/useAuthStore";
-import { getSuggestions, toggleFollow } from "../services/usersService";
-import { getUnreadCount } from "../services/notificationsService";
 import { useSocket } from "../context/SocketContext";
+import { useTheme } from "../context/ThemeContext";
+import LCIcon from "./LCIcon";
+import LASULogo from "./LASULogo";
 
-const NAV = [
-  { to: "/", icon: "🏠", label: "Home", exact: true },
-  { to: "/reels", icon: "🎬", label: "Reels" },
-  { to: "/courses", icon: "📚", label: "Courses" },
-  { to: "/messages", icon: "💬", label: "Messages" },
-  { to: "/search", icon: "🔍", label: "Search" },
-  { to: "/live", icon: "🔴", label: "Live" },
-  { to: "/notifications", icon: "🔔", label: "Notifications", hasBadge: true },
-  { to: "/announcements", icon: "📢", label: "Announcements" },
-];
-
-// ── Suggestion mini card ───────────────────────────────────
-const SuggestionCard = ({ user }) => {
-  const navigate = useNavigate();
-  const [following, setFollowing] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const colors = [
-    "#1D4ED8",
-    "#7C3AED",
-    "#DB2777",
-    "#059669",
-    "#D97706",
-    "#DC2626",
-  ];
-  const color = colors[(user?.username?.charCodeAt(0) || 0) % colors.length];
-  const initials = user.fullName
-    ?.split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
-  const handleFollow = async (e) => {
-    e.stopPropagation();
-    if (loading) return;
-    setLoading(true);
-    setFollowing((p) => !p);
-    try {
-      await toggleFollow(user.username);
-    } catch {
-      setFollowing((p) => !p);
-    }
-    setLoading(false);
-  };
-
-  return (
-    <div
-      style={s.suggCard}
-      onClick={() => navigate(`/profile/${user.username}`)}
-    >
-      <div
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: "50%",
-          background: user.avatarUrl ? "transparent" : color,
-          overflow: "hidden",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
-        {user.avatarUrl ? (
-          <img
-            src={user.avatarUrl}
-            alt=""
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : (
-          <span
-            style={{
-              color: "white",
-              fontWeight: 700,
-              fontSize: 12,
-              fontFamily: "Geist, sans-serif",
-            }}
-          >
-            {initials}
-          </span>
-        )}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={s.suggName}>{user.fullName}</div>
-        <div style={s.suggMeta}>{user.department}</div>
-      </div>
-      <button
-        onClick={handleFollow}
-        disabled={loading}
-        style={{ ...s.suggFollow, ...(following ? s.suggFollowing : {}) }}
-      >
-        {following ? "✓" : "+"}
-      </button>
-    </div>
-  );
-};
-
-const AppLayout = () => {
-  const { user, logout } = useAuthStore();
-  const navigate = useNavigate();
-  const socket = useSocket();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login");
-  };
-  const initials =
-    user?.fullName
-      ?.split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2) || "LC";
-
-  // Load initial unread count
-  useEffect(() => {
-    getUnreadCount()
-      .then((res) => setUnreadCount(res.data.data.count))
-      .catch(() => {});
-
-    getSuggestions()
-      .then((res) => setSuggestions(res.data.data.suggestions))
-      .catch(() => {});
-  }, []);
-
-  // Listen for new notifications via Socket.IO — increment badge
+// ── Notification count ─────────────────────────────────────
+const useUnreadCount = (socket) => {
+  const [count, setCount] = useState(0);
   useEffect(() => {
     if (!socket) return;
-    const handler = () => setUnreadCount((c) => c + 1);
+    const handler = () => setCount((c) => c + 1);
     socket.on("notification:new", handler);
     return () => socket.off("notification:new", handler);
   }, [socket]);
+  return { count, clear: () => setCount(0) };
+};
 
-  // When user visits /notifications, reset badge
-  const handleNotifClick = () => {
-    setUnreadCount(0);
-  };
-
+// ── User avatar ────────────────────────────────────────────
+const UserAvatar = ({ user, size = 28, active = false }) => {
+  const initials =
+    user?.fullName?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?";
+  const seeds = ["#0F6E56", "#7C3AED", "#DB2777", "#D97706", "#2563EB"];
+  const bg = seeds[(user?.username?.charCodeAt(0) || 0) % seeds.length];
   return (
-    <div style={s.root}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        a { text-decoration: none; }
-        .nav-link { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: 12px; color: #64748B; font-size: 15px; font-weight: 500; transition: all 0.18s; cursor: pointer; font-family: 'DM Sans', sans-serif; position: relative; }
-        .nav-link:hover { background: #F1F5F9; color: #0F172A; }
-        .nav-link.active { background: #EFF6FF; color: #2563EB; font-weight: 700; }
-        .nav-link.active .nav-icon { transform: scale(1.15); }
-        .nav-icon { font-size: 20px; transition: transform 0.18s; width: 24px; text-align: center; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes badgePop { 0% { transform: scale(0); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
-        .page-enter { animation: fadeIn 0.3s ease forwards; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 4px; }
-        @media (max-width: 900px) {
-          .sidebar { display: none !important; }
-          .right-panel { display: none !important; }
-          .mobile-bar { display: flex !important; }
-          .bottom-nav { display: flex !important; }
-          .main-content { padding: 16px !important; }
-        }
-      `}</style>
-
-      {/* ── Sidebar ── */}
-      <aside className="sidebar" style={s.sidebar}>
-        <div style={s.brand}>
-          <div style={s.brandIcon}>LC</div>
-          <div>
-            <div style={s.brandName}>LASUConnect</div>
-            <div style={s.brandSub}>Lagos State University</div>
-          </div>
-        </div>
-
-        <nav style={s.nav}>
-          {NAV.map(({ to, icon, label, exact, hasBadge }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={exact}
-              className={({ isActive }) =>
-                `nav-link${isActive ? " active" : ""}`
-              }
-              onClick={hasBadge ? handleNotifClick : undefined}
-            >
-              <span className="nav-icon">{icon}</span>
-              <span style={{ flex: 1 }}>{label}</span>
-              {/* Live notification badge */}
-              {hasBadge && unreadCount > 0 && (
-                <span style={s.badge}>
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              )}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div style={s.divider} />
-
-        <NavLink
-          to={`/profile/${user?.username}`}
-          className="nav-link"
-          style={{ marginBottom: 8 }}
-        >
-          <div style={s.avatarSmall}>
-            {user?.avatarUrl ? (
-              <img
-                src={user.avatarUrl}
-                alt=""
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  borderRadius: "50%",
-                }}
-              />
-            ) : (
-              <span style={s.avatarInitials}>{initials}</span>
-            )}
-          </div>
-          <div>
-            <div
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: "#0F172A",
-                lineHeight: 1.2,
-                fontFamily: "Geist, sans-serif",
-              }}
-            >
-              {user?.fullName}
-            </div>
-            <div style={{ fontSize: 12, color: "#94A3B8" }}>
-              @{user?.username}
-            </div>
-          </div>
-        </NavLink>
-
-        <button onClick={handleLogout} style={s.logoutBtn}>
-          <span>🚪</span> Sign Out
-        </button>
-      </aside>
-
-      {/* ── Main Content ── */}
-      <main style={s.main}>
-        {/* Mobile topbar */}
-        <div className="mobile-bar" style={{ ...s.mobileBar, display: "none" }}>
-          <div style={s.brand}>
-            <div
-              style={{ ...s.brandIcon, width: 32, height: 32, fontSize: 13 }}
-            >
-              LC
-            </div>
-            <span style={{ ...s.brandName, fontSize: 16 }}>LASUConnect</span>
-          </div>
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <NavLink
-              to="/search"
-              style={{ fontSize: 20, textDecoration: "none" }}
-            >
-              🔍
-            </NavLink>
-            {/* Mobile notification bell */}
-            <NavLink
-              to="/notifications"
-              onClick={handleNotifClick}
-              style={{
-                position: "relative",
-                fontSize: 20,
-                textDecoration: "none",
-              }}
-            >
-              🔔
-              {unreadCount > 0 && (
-                <span
-                  style={{
-                    ...s.badge,
-                    position: "absolute",
-                    top: -6,
-                    right: -6,
-                    fontSize: 9,
-                    minWidth: 16,
-                    height: 16,
-                    padding: "0 4px",
-                  }}
-                >
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
-            </NavLink>
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              style={s.hamburger}
-            >
-              {mobileMenuOpen ? "✕" : "☰"}
-            </button>
-          </div>
-        </div>
-
-        {mobileMenuOpen && (
-          <div style={s.mobileDrawer}>
-            {NAV.map(({ to, icon, label, exact, hasBadge }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={exact}
-                className={({ isActive }) =>
-                  `nav-link${isActive ? " active" : ""}`
-                }
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  if (hasBadge) handleNotifClick();
-                }}
-              >
-                <span className="nav-icon">{icon}</span>
-                <span style={{ flex: 1 }}>{label}</span>
-                {hasBadge && unreadCount > 0 && (
-                  <span style={s.badge}>{unreadCount}</span>
-                )}
-              </NavLink>
-            ))}
-            <button
-              onClick={handleLogout}
-              style={{ ...s.logoutBtn, margin: "8px 0 0" }}
-            >
-              <span>🚪</span> Sign Out
-            </button>
-          </div>
-        )}
-
-        <div className="main-content page-enter" style={s.content}>
-          <Outlet />
-        </div>
-      </main>
-
-      {/* ── Right Panel ── */}
-      <aside className="right-panel" style={s.rightPanel}>
-        {/* User card */}
-        <div style={s.userCard}>
-          <div style={s.bigAvatar}>
-            {user?.avatarUrl ? (
-              <img
-                src={user.avatarUrl}
-                alt=""
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  borderRadius: "50%",
-                }}
-              />
-            ) : (
-              <span style={s.bigAvatarText}>{initials}</span>
-            )}
-          </div>
-          <NavLink
-            to={`/profile/${user?.username}`}
-            style={{ textDecoration: "none" }}
-          >
-            <div style={s.userName}>{user?.fullName}</div>
-          </NavLink>
-          <div style={s.userHandle}>@{user?.username}</div>
-          <div style={s.userMeta}>
-            <span style={s.metaBadge}>🎓 {user?.level} Level</span>
-            <span style={s.metaBadge}>📚 {user?.department}</span>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div style={s.statsCard}>
-          <div style={s.statsTitle}>Your Stats</div>
-          <div style={s.statsGrid}>
-            {[
-              { label: "Followers", value: user?.followersCount || 0 },
-              { label: "Following", value: user?.followingCount || 0 },
-            ].map(({ label, value }) => (
-              <div key={label} style={s.statItem}>
-                <div style={s.statNum}>{value}</div>
-                <div style={s.statLabel}>{label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Suggestions */}
-        {suggestions.length > 0 && (
-          <div style={s.suggestionsCard}>
-            <div style={s.suggestionsHeader}>
-              <span style={s.statsTitle}>👥 People you may know</span>
-              <NavLink
-                to="/search"
-                style={{
-                  fontSize: 12,
-                  color: "#2563EB",
-                  fontWeight: 600,
-                  textDecoration: "none",
-                }}
-              >
-                See all
-              </NavLink>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {suggestions.slice(0, 4).map((u) => (
-                <SuggestionCard key={u._id} user={u} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Campus notice */}
-        <div style={s.noticeCard}>
-          <div style={s.noticeHeader}>📢 Campus</div>
-          <p style={s.noticeText}>
-            Welcome to LASUConnect! Explore courses, connect with classmates,
-            and stay updated on campus life.
-          </p>
-        </div>
-      </aside>
-
-      {/* ── Bottom Mobile Nav ── */}
-      <nav className="bottom-nav" style={{ ...s.bottomNav, display: "none" }}>
-        {[
-          { to: "/", icon: "🏠", exact: true },
-          { to: "/reels", icon: "🎬" },
-          { to: "/search", icon: "🔍" },
-          { to: "/messages", icon: "💬" },
-          { to: "/notifications", icon: "🔔", hasBadge: true },
-        ].map(({ to, icon, exact, hasBadge }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={exact}
-            onClick={hasBadge ? handleNotifClick : undefined}
-            style={({ isActive }) => ({
-              ...s.bottomNavItem,
-              color: isActive ? "#2563EB" : "#94A3B8",
-              background: isActive ? "#EFF6FF" : "transparent",
-            })}
-          >
-            <div style={{ position: "relative" }}>
-              <span style={{ fontSize: 22 }}>{icon}</span>
-              {hasBadge && unreadCount > 0 && (
-                <span
-                  style={{
-                    ...s.badge,
-                    position: "absolute",
-                    top: -6,
-                    right: -8,
-                    fontSize: 9,
-                    minWidth: 16,
-                    height: 16,
-                    padding: "0 4px",
-                  }}
-                >
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
-            </div>
-          </NavLink>
-        ))}
-
-        {/* Profile avatar — navigates to own profile */}
-        <NavLink
-          to={`/profile/${user?.username}`}
-          style={({ isActive }) => ({
-            ...s.bottomNavItem,
-            color: isActive ? "#2563EB" : "#94A3B8",
-            background: isActive ? "#EFF6FF" : "transparent",
-          })}
-        >
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: "50%",
-              overflow: "hidden",
-              border: "2px solid currentColor",
-              background: user?.avatarUrl ? "transparent" : "#2563EB",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
-          >
-            {user?.avatarUrl ? (
-              <img
-                src={user.avatarUrl}
-                alt=""
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            ) : (
-              <span
-                style={{
-                  color: "white",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  fontFamily: "Geist, sans-serif",
-                }}
-              >
-                {user?.fullName
-                  ?.split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .toUpperCase()
-                  .slice(0, 2) || "?"}
-              </span>
-            )}
-          </div>
-        </NavLink>
-      </nav>
+    <div style={{
+      width: size, height: size, borderRadius: "50%", overflow: "hidden",
+      flexShrink: 0,
+      border: active ? "2px solid var(--brand)" : "1.5px solid var(--border-sec)",
+      background: user?.avatarUrl ? "transparent" : bg,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      transition: "border-color var(--duration-fast) var(--ease-out)",
+    }}>
+      {user?.avatarUrl
+        ? <img src={user.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        : <span style={{ color: "white", fontSize: size * 0.34, fontWeight: 700, fontFamily: "var(--font-display)" }}>{initials}</span>
+      }
     </div>
   );
 };
 
-// ─── Styles ───────────────────────────────────────────────
-const s = {
-  root: {
-    display: "flex",
-    minHeight: "100vh",
-    background: "#F8FAFC",
-    fontFamily: "'DM Sans', sans-serif",
-  },
-  sidebar: {
-    width: 260,
-    background: "white",
-    borderRight: "1px solid #E2E8F0",
-    padding: "24px 16px",
-    display: "flex",
-    flexDirection: "column",
-    position: "sticky",
-    top: 0,
-    height: "100vh",
-    overflowY: "auto",
-    flexShrink: 0,
-  },
-  brand: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 28,
-    padding: "0 8px",
-  },
-  brandIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    background: "linear-gradient(135deg, #1D4ED8, #3B82F6)",
-    color: "white",
-    fontWeight: 800,
-    fontSize: 15,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontFamily: "Geist, sans-serif",
-    flexShrink: 0,
-  },
-  brandName: {
-    fontFamily: "Geist, sans-serif",
-    fontWeight: 800,
-    fontSize: 18,
-    color: "#0F172A",
-    lineHeight: 1.1,
-  },
-  brandSub: { fontSize: 10, color: "#94A3B8", fontWeight: 500 },
-  nav: { display: "flex", flexDirection: "column", gap: 2, flex: 1 },
-  divider: { height: 1, background: "#E2E8F0", margin: "16px 0" },
-  avatarSmall: {
-    width: 36,
-    height: 36,
-    borderRadius: "50%",
-    background: "linear-gradient(135deg, #1D4ED8, #60A5FA)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    flexShrink: 0,
-  },
-  avatarInitials: {
-    color: "white",
-    fontWeight: 700,
-    fontSize: 13,
-    fontFamily: "Geist, sans-serif",
-  },
-  logoutBtn: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "10px 16px",
-    borderRadius: 12,
-    border: "none",
-    background: "none",
-    color: "#EF4444",
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: "pointer",
-    fontFamily: "'DM Sans', sans-serif",
-    width: "100%",
-  },
+// ── Theme toggle ───────────────────────────────────────────
+const ThemeToggle = ({ compact = false }) => {
+  const { mode, theme, setMode, toggleTheme } = useTheme();
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      <button onClick={toggleTheme} style={{
+        width: 34, height: 34, borderRadius: "var(--radius-sm)",
+        border: "0.5px solid var(--border-sec)", background: "var(--bg-surface)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        cursor: "pointer", transition: "all var(--duration-fast) var(--ease-out)",
+        flexShrink: 0,
+      }}>
+        <LCIcon name={theme === "dark" ? "sun" : "moon"} size={15} color="var(--text-secondary)" />
+      </button>
 
-  // Notification badge
-  badge: {
-    background: "#EF4444",
-    color: "white",
-    borderRadius: 20,
-    padding: "1px 6px",
-    fontSize: 10,
-    fontWeight: 800,
-    minWidth: 18,
-    height: 18,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontFamily: "Geist, sans-serif",
-    animation: "badgePop 0.3s ease",
-    lineHeight: 1,
-  },
+      {!compact && (
+        <div style={{
+          display: "flex", borderRadius: "var(--radius-sm)",
+          border: "0.5px solid var(--border-sec)", overflow: "hidden",
+          background: "var(--bg-surface)",
+        }}>
+          {[["academic", "📚"], ["social", "🌐"]].map(([m, emoji]) => (
+            <button key={m} onClick={() => setMode(m)} style={{
+              padding: "6px 10px", border: "none", cursor: "pointer",
+              background: mode === m ? "var(--brand)" : "transparent",
+              color: mode === m ? "var(--text-inverse)" : "var(--text-tertiary)",
+              fontSize: 12, fontWeight: 600, fontFamily: "var(--font-body)",
+              transition: "all var(--duration-fast) var(--ease-out)",
+            }}>
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
-  main: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column" },
-  content: {
-    flex: 1,
-    padding: "24px",
-    maxWidth: 680,
-    margin: "0 auto",
-    width: "100%",
-  },
-  mobileBar: {
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "12px 16px",
-    background: "white",
-    borderBottom: "1px solid #E2E8F0",
-    position: "sticky",
-    top: 0,
-    zIndex: 50,
-  },
-  hamburger: {
-    background: "none",
-    border: "none",
-    fontSize: 20,
-    cursor: "pointer",
-    color: "#0F172A",
-  },
-  mobileDrawer: {
-    background: "white",
-    borderBottom: "1px solid #E2E8F0",
-    padding: "12px 16px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 4,
-  },
+// ── Mode card (right panel) ────────────────────────────────
+const ModeCard = () => {
+  const { mode, setMode } = useTheme();
+  return (
+    <div className="lc-card" style={{ padding: "14px 16px", marginBottom: 16 }}>
+      <div style={{
+        fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)",
+        marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em",
+      }}>
+        Current Mode
+      </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        {[["academic", "📚 Academic"], ["social", "🌐 Social"]].map(([m, label]) => (
+          <button key={m} onClick={() => setMode(m)} style={{
+            flex: 1, padding: "8px", borderRadius: "var(--radius-sm)",
+            border: `1.5px solid ${mode === m ? "var(--brand)" : "var(--border)"}`,
+            background: mode === m ? "var(--brand-light)" : "var(--bg-input)",
+            color: mode === m ? "var(--brand)" : "var(--text-secondary)",
+            fontSize: 12, fontWeight: 600, cursor: "pointer",
+            fontFamily: "var(--font-body)",
+            transition: "all var(--duration-fast) var(--ease-out)",
+          }}>
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
 
-  rightPanel: {
-    width: 280,
-    padding: "24px 16px",
-    display: "flex",
-    flexDirection: "column",
-    gap: 16,
-    flexShrink: 0,
-    position: "sticky",
-    top: 0,
-    height: "100vh",
-    overflowY: "auto",
-  },
-  userCard: {
-    background: "white",
-    borderRadius: 16,
-    padding: 20,
-    textAlign: "center",
-    border: "1px solid #E2E8F0",
-  },
-  bigAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: "50%",
-    background: "linear-gradient(135deg, #1D4ED8, #60A5FA)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    margin: "0 auto 12px",
-    overflow: "hidden",
-  },
-  bigAvatarText: {
-    color: "white",
-    fontWeight: 800,
-    fontSize: 22,
-    fontFamily: "Geist, sans-serif",
-  },
-  userName: {
-    fontFamily: "Geist, sans-serif",
-    fontWeight: 700,
-    fontSize: 15,
-    color: "#0F172A",
-    marginBottom: 2,
-  },
-  userHandle: { fontSize: 12, color: "#94A3B8", marginBottom: 10 },
-  userMeta: {
-    display: "flex",
-    gap: 6,
-    justifyContent: "center",
-    flexWrap: "wrap",
-  },
-  metaBadge: {
-    background: "#F1F5F9",
-    borderRadius: 20,
-    padding: "3px 10px",
-    fontSize: 11,
-    color: "#475569",
-    fontWeight: 600,
-  },
-  statsCard: {
-    background: "white",
-    borderRadius: 16,
-    padding: 16,
-    border: "1px solid #E2E8F0",
-  },
-  statsTitle: {
-    fontFamily: "Geist, sans-serif",
-    fontWeight: 700,
-    fontSize: 13,
-    color: "#0F172A",
-    marginBottom: 12,
-  },
-  statsGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
-  statItem: {
-    textAlign: "center",
-    background: "#F8FAFC",
-    borderRadius: 10,
-    padding: "10px 6px",
-  },
-  statNum: {
-    fontFamily: "Geist, sans-serif",
-    fontWeight: 800,
-    fontSize: 20,
-    color: "#2563EB",
-  },
-  statLabel: { fontSize: 11, color: "#94A3B8", fontWeight: 600, marginTop: 2 },
-  suggestionsCard: {
-    background: "white",
-    borderRadius: 16,
-    padding: 16,
-    border: "1px solid #E2E8F0",
-  },
-  suggestionsHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  suggCard: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "8px 4px",
-    cursor: "pointer",
-    borderRadius: 10,
-    transition: "background 0.15s",
-  },
-  suggName: {
-    fontFamily: "Geist, sans-serif",
-    fontWeight: 600,
-    fontSize: 13,
-    color: "#0F172A",
-    lineHeight: 1.2,
-  },
-  suggMeta: { fontSize: 11, color: "#94A3B8" },
-  suggFollow: {
-    width: 28,
-    height: 28,
-    borderRadius: "50%",
-    border: "none",
-    background: "#2563EB",
-    color: "white",
-    fontSize: 16,
-    fontWeight: 700,
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    transition: "all 0.15s",
-  },
-  suggFollowing: { background: "#F1F5F9", color: "#374151", fontSize: 12 },
-  noticeCard: {
-    background: "linear-gradient(135deg, #EFF6FF, #DBEAFE)",
-    borderRadius: 16,
-    padding: 16,
-    border: "1px solid #BFDBFE",
-  },
-  noticeHeader: {
-    fontFamily: "Geist, sans-serif",
-    fontWeight: 700,
-    fontSize: 13,
-    color: "#1D4ED8",
-    marginBottom: 8,
-  },
-  noticeText: { fontSize: 12.5, color: "#3B5FBA", lineHeight: 1.6 },
-  bottomNav: {
-    position: "fixed",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    background: "white",
-    borderTop: "1px solid #E2E8F0",
-    padding: "8px 0",
-    zIndex: 100,
-    justifyContent: "space-around",
-  },
-  bottomNavItem: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "6px 12px",
-    borderRadius: 10,
-    transition: "all 0.15s",
-  },
+// ── Main AppLayout ─────────────────────────────────────────
+const AppLayout = () => {
+  const { user }  = useAuthStore();
+  const socket    = useSocket();
+  const navigate  = useNavigate();
+  const { mode }  = useTheme();
+  const { count: unreadCount, clear } = useUnreadCount(socket);
+  const [showMore, setShowMore] = useState(false);
+
+  const isAdmin = ["admin", "super_admin"].includes(user?.role);
+
+  const NAV = [
+    { to: "/",              icon: "home",     label: "Home",     exact: true },
+    { to: "/reels",         icon: "reels",    label: "Reels" },
+    { to: "/search",        icon: "search",   label: "Search" },
+    { to: "/messages",      icon: "messages", label: "Messages" },
+    { to: "/notifications", icon: "bell",     label: "Alerts",  badge: unreadCount, onTap: clear },
+  ];
+
+  const SIDEBAR_EXTRA = [
+    { to: "/live",          icon: "live",          label: "Live" },
+    { to: "/courses",       icon: "courses",       label: "Courses" },
+    { to: "/announcements", icon: "announcements", label: "Announce" },
+    { to: "/handbook",      icon: "file-text",     label: "Handbook" },
+    ...(isAdmin ? [{ to: "/admin", icon: "admin", label: "Admin" }] : []),
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", background: "var(--bg-page)", fontFamily: "var(--font-body)" }}>
+      <style>{`
+        /* ── nav link resets ── */
+        .lc-nav-link { text-decoration: none; }
+
+        /* ── sidebar links ── */
+        .sidebar-link {
+          display: flex; align-items: center; gap: 12px;
+          padding: 10px 12px; border-radius: var(--radius-md);
+          text-decoration: none; cursor: pointer;
+          transition: background var(--duration-fast) var(--ease-out);
+          color: var(--text-secondary);
+        }
+        .sidebar-link:hover  { background: var(--bg-hover); color: var(--text-primary); }
+        .sidebar-link.active { background: var(--brand-light); color: var(--brand); }
+        .sidebar-link span   { font-size: 14px; font-weight: 500; font-family: var(--font-body); }
+
+        /* ── bottom nav items ── */
+        .nav-item {
+          display: flex; flex-direction: column; align-items: center;
+          gap: 3px; padding: 6px 8px; border-radius: var(--radius-md);
+          cursor: pointer; position: relative;
+          transition: background var(--duration-fast) var(--ease-out);
+          text-decoration: none; min-width: 44px;
+        }
+        .nav-item:hover            { background: var(--bg-hover); }
+        .nav-item.active           { background: var(--brand-light); }
+        .nav-item.active .nav-label { color: var(--brand); font-weight: 600; }
+        .nav-label {
+          font-size: 10px; color: var(--text-tertiary);
+          font-family: var(--font-body); font-weight: 500;
+          transition: color var(--duration-fast);
+          white-space: nowrap;
+        }
+
+        /* ── Left sidebar: visible on desktop, hidden on mobile ── */
+        .lc-sidebar {
+          display: flex;
+          flex-direction: column;
+          width: 240px;
+          flex-shrink: 0;
+          padding: 20px 12px;
+          position: sticky;
+          top: 0;
+          height: 100vh;
+          overflow-y: auto;
+          gap: 4px;
+        }
+        @media (max-width: 767px) {
+          .lc-sidebar { display: none !important; }
+        }
+
+        /* ── Right panel: visible on desktop, hidden on mobile ── */
+        .lc-right-panel {
+          display: flex;
+          flex-direction: column;
+          width: 280px;
+          flex-shrink: 0;
+          padding: 20px 16px;
+          position: sticky;
+          top: 0;
+          height: 100vh;
+          overflow-y: auto;
+        }
+        @media (max-width: 1100px) {
+          .lc-right-panel { display: none !important; }
+        }
+
+        /* ── Mobile header: hidden on desktop, flex on mobile ── */
+        .lc-mobile-header {
+          display: none;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 14px;
+          padding-top: 4px;
+        }
+        @media (max-width: 767px) {
+          .lc-mobile-header { display: flex !important; }
+        }
+
+        /* ── Bottom nav: hidden on desktop, fixed flex bar on mobile ── */
+        .lc-bottom-nav {
+          display: none;
+        }
+        @media (max-width: 767px) {
+          .lc-bottom-nav {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-around !important;
+            align-items: center !important;
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            background: var(--nav-bg) !important;
+            backdrop-filter: var(--nav-blur) !important;
+            -webkit-backdrop-filter: var(--nav-blur) !important;
+            border-top: 0.5px solid var(--border-sec) !important;
+            padding: 6px 4px !important;
+            padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+            z-index: 100 !important;
+          }
+        }
+      `}</style>
+
+      <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex" }}>
+
+        {/* ── Left Sidebar (desktop only) ── */}
+        <aside className="lc-sidebar">
+          {/* Logo */}
+          <div style={{ marginBottom: 24, padding: "4px 0" }}>
+            <LASULogo size={38} withText textSize={17} />
+          </div>
+
+          {/* Nav links */}
+          {[...NAV, ...SIDEBAR_EXTRA].map(({ to, icon, label, exact, badge, onTap }) => (
+            <NavLink key={to} to={to} end={exact} onClick={onTap}
+              className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
+              {({ isActive }) => (
+                <>
+                  <div style={{ position: "relative", flexShrink: 0 }}>
+                    <LCIcon name={icon} size={20} color={isActive ? "var(--brand)" : "var(--text-secondary)"} />
+                    {badge > 0 && <div className="lc-badge">{badge > 99 ? "99+" : badge}</div>}
+                  </div>
+                  <span>{label}</span>
+                </>
+              )}
+            </NavLink>
+          ))}
+
+          <div style={{ flex: 1 }} />
+
+          {/* Theme toggle + profile */}
+          <div style={{ paddingTop: 12, borderTop: "0.5px solid var(--border)", marginTop: 8 }}>
+            <div style={{ marginBottom: 10 }}>
+              <ThemeToggle />
+            </div>
+            <NavLink to={`/profile/${user?.username}`}
+              className={({ isActive }) => `sidebar-link${isActive ? " active" : ""}`}>
+              {({ isActive }) => (
+                <>
+                  <UserAvatar user={user} size={32} active={isActive} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {user?.fullName?.split(" ")[0]}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>@{user?.username}</div>
+                  </div>
+                </>
+              )}
+            </NavLink>
+          </div>
+        </aside>
+
+        {/* ── Main content ── */}
+        <main style={{
+          flex: 1, minWidth: 0,
+          padding: "20px 16px 96px",
+        }}>
+          {/* Mobile-only header */}
+          <div className="lc-mobile-header">
+            <LASULogo size={30} withText textSize={14} />
+            <ThemeToggle compact />
+          </div>
+
+          <Outlet />
+        </main>
+
+        {/* ── Right panel (desktop only) ── */}
+        <aside className="lc-right-panel">
+          <div style={{ position: "relative", marginBottom: 16 }}>
+            <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+              <LCIcon name="search" size={15} color="var(--text-tertiary)" />
+            </div>
+            <input placeholder="Search LASUConnect..." className="lc-input"
+              style={{ paddingLeft: 36, fontSize: 13 }}
+              onFocus={() => navigate("/search")} readOnly />
+          </div>
+          <ModeCard />
+          <div id="right-panel-slot" />
+        </aside>
+      </div>
+
+      {/* ── Bottom nav (mobile only) ── */}
+      <nav className="lc-bottom-nav">
+        {NAV.map(({ to, icon, label, exact, badge, onTap }) => (
+          <NavLink key={to} to={to} end={exact} className="lc-nav-link" onClick={onTap}>
+            {({ isActive }) => (
+              <div className={`nav-item${isActive ? " active" : ""}`}>
+                <div style={{ position: "relative" }}>
+                  <LCIcon name={icon} size={22} color={isActive ? "var(--brand)" : "var(--text-tertiary)"} />
+                  {badge > 0 && <div className="lc-badge">{badge > 9 ? "9+" : badge}</div>}
+                </div>
+                <span className="nav-label">{label}</span>
+              </div>
+            )}
+          </NavLink>
+        ))}
+
+        {/* More button — opens drawer */}
+        <button className="lc-nav-link" onClick={() => setShowMore(true)}
+          style={{ background: "none", border: "none", cursor: "pointer" }}>
+          <div className="nav-item">
+            <LCIcon name="more-h" size={22} color="var(--text-tertiary)" />
+            <span className="nav-label">More</span>
+          </div>
+        </button>
+      </nav>
+
+      {/* ── More drawer (mobile) ── */}
+      {showMore && (
+        <>
+          {/* Backdrop */}
+          <div onClick={() => setShowMore(false)} style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+            zIndex: 200, backdropFilter: "blur(2px)",
+          }} />
+          {/* Drawer */}
+          <div style={{
+            position: "fixed", bottom: 0, left: 0, right: 0,
+            background: "var(--bg-surface)",
+            borderRadius: "20px 20px 0 0",
+            padding: "20px 16px 40px",
+            zIndex: 201,
+            boxShadow: "var(--shadow-3)",
+            border: "0.5px solid var(--border-sec)",
+            animation: "lc-fade-up 0.2s var(--ease-out)",
+          }}>
+            {/* Handle */}
+            <div style={{ width: 36, height: 4, background: "var(--border-sec)", borderRadius: 4, margin: "0 auto 20px" }} />
+
+            <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 13, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+              More
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {SIDEBAR_EXTRA.map(({ to, icon, label }) => (
+                <NavLink key={to} to={to} className="lc-nav-link"
+                  onClick={() => setShowMore(false)}>
+                  {({ isActive }) => (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 12,
+                      padding: "12px 14px", borderRadius: "var(--radius-md)",
+                      background: isActive ? "var(--brand-light)" : "var(--bg-elevated)",
+                      border: `0.5px solid ${isActive ? "var(--border-sec)" : "var(--border)"}`,
+                      cursor: "pointer", textDecoration: "none",
+                      transition: "background var(--duration-fast)",
+                    }}>
+                      <LCIcon name={icon} size={20} color={isActive ? "var(--brand)" : "var(--text-secondary)"} />
+                      <span style={{
+                        fontFamily: "var(--font-body)", fontWeight: 600,
+                        fontSize: 13, color: isActive ? "var(--brand)" : "var(--text-primary)",
+                      }}>
+                        {label}
+                      </span>
+                    </div>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+
+            {/* Profile row */}
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "0.5px solid var(--border)" }}>
+              <NavLink to={`/profile/${user?.username}`} className="lc-nav-link"
+                onClick={() => setShowMore(false)}>
+                {({ isActive }) => (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "10px 14px", borderRadius: "var(--radius-md)",
+                    background: isActive ? "var(--brand-light)" : "transparent",
+                    cursor: "pointer",
+                  }}>
+                    <UserAvatar user={user} size={32} active={isActive} />
+                    <div>
+                      <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 14, color: "var(--text-primary)" }}>
+                        {user?.fullName}
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                        View profile
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </NavLink>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 };
 
 export default AppLayout;

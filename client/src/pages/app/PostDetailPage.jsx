@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import useAuthStore from '../../context/useAuthStore';
+import useIsMobile from '../../hooks/useIsMobile';
 import { getPost, toggleLike, getComments, addComment, deleteComment } from '../../services/postsService';
 
 // ── Helpers ────────────────────────────────────────────────
@@ -109,6 +110,7 @@ const CommentItem = ({ comment, currentUser, postAuthorId, onDelete }) => {
 
 // ── Main Post Detail Page ──────────────────────────────────
 const PostDetailPage = () => {
+  const isMobile = useIsMobile();
   const { id }    = useParams();
   const navigate  = useNavigate();
   const { user }  = useAuthStore();
@@ -238,20 +240,18 @@ const PostDetailPage = () => {
   const isAuthor = post?.author?._id === user?._id;
 
   return (
-    <div style={{ paddingBottom: 80, fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ paddingBottom: isMobile ? 96 : 40, fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; }
         textarea:focus, input:focus { outline: none; }
         @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
       `}</style>
 
       {/* Back button */}
-      <button onClick={() => navigate(-1)} style={s.backBtn}>← Back</button>
+      <button onClick={() => navigate(-1)} style={{ ...s.backBtn, fontSize: isMobile ? 13 : 14 }}>← Back</button>
 
       {/* Post card */}
-      <div style={{ ...s.card, animation: 'fadeUp 0.3s ease forwards' }}>
+      <div style={{ ...s.card, padding: isMobile ? 14 : 20, animation: 'fadeUp 0.3s ease forwards' }}>
 
         {/* Author row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>

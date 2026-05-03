@@ -623,6 +623,7 @@ const CourseHubView = ({ courseId, onBack, currentUser }) => {
 // ── Main Courses Page ──────────────────────────────────────
 const CoursesPage = () => {
   const { user } = useAuthStore();
+  const isMobile = useIsMobile();
   const [view, setView] = useState('discover'); // discover | mine
   const [activeCourseId, setActiveCourseId] = useState(null);
   const [courses, setCourses] = useState([]);
@@ -661,7 +662,7 @@ const CoursesPage = () => {
   );
 
   return (
-    <div style={s.page}>
+    <div style={{ ...s.page, paddingBottom: isMobile ? 96 : 40 }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; }
@@ -784,7 +785,7 @@ const CoursesPage = () => {
 
 // ─── Styles ───────────────────────────────────────────────
 const s = {
-  page: { paddingBottom: 80, fontFamily: "'DM Sans', sans-serif" },
+  page: { paddingBottom: 'var(--pb, 40px)', fontFamily: "'DM Sans', sans-serif" },
   pageTitle: { fontFamily: 'Geist, sans-serif', fontWeight: 800, fontSize: 26, color: '#0F172A', margin: 0 },
   pageSubtitle: { fontSize: 14, color: '#64748B', marginTop: 4 },
 
@@ -806,7 +807,7 @@ const s = {
   courseStats: { display: 'flex', gap: 10, fontSize: 11, color: '#64748B', flexWrap: 'wrap' },
 
   // Hub view
-  hubView: { paddingBottom: 80 },
+  hubView: { paddingBottom: 96 },
   backBtn: { background: 'none', border: 'none', color: '#2563EB', fontSize: 14, fontWeight: 600, cursor: 'pointer', padding: '0 0 16px', fontFamily: "'DM Sans', sans-serif" },
   hubHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: 'white', borderRadius: 16, padding: 20, border: '1px solid #E2E8F0', marginBottom: 12, gap: 16 },
   hubHeaderLeft: { display: 'flex', gap: 16, flex: 1, minWidth: 0 },

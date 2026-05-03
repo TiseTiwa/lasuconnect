@@ -1,107 +1,111 @@
-import { create } from "zustand";
-import api from "../services/api";
-import axios from 'axios';
+import { create } from 'zustand';
+import api from '../services/api';
 
-// ─────────────────────────────────────────────────────────
-//  useAuthStore — Zustand global store for authentication.
-//  Manages: user object, accessToken, loading states.
-//  Components use this instead of prop drilling or Context.
-// ─────────────────────────────────────────────────────────
+// ── Session key ───────────────────────────────────────────
+// We store a lightweight "session exists" flag in sessionStorage (tab-scoped)
+// AND the access token in localStorage (persists across tabs).
+// On every fresh page load we ALWAYS re-verify with the server.
+const SESSION_KEY = 'lc_session';
+
 const useAuthStore = create((set, get) => ({
-  user: null,
-  accessToken: null,
+  user:            null,
   isAuthenticated: false,
-  isLoading: false,
-  error: null,
+  isLoading:       true,   // start true → ProtectedRoute shows spinner until checked
+  error:           null,
 
-  // ── Login ─────────────────────────────────────────────
+  clearError: () => set({ error: null }),
+
+  // ── Login ───────────────────────────────────────────────
   login: async (credentials) => {
     set({ isLoading: true, error: null });
     try {
-      const { data } = await api.post("/auth/login", credentials);
-      const { user, accessToken } = data.data;
+      const res = await api.post('/auth/login', credentials);
+      const { user, accessToken } = res.data.data;
 
-      // Store access token in memory (and localStorage for page refresh)
-      localStorage.setItem("accessToken", accessToken);
+      if (accessToken) {
+        localStorage.setItem('accessToken', accessToken);
+        sessionStorage.setItem(SESSION_KEY, '1'); // mark session as intentional
+      }
 
-      set({ user, accessToken, isAuthenticated: true, isLoading: false });
+      set({ user, isAuthenticated: true, isLoading: false, error: null });
       return { success: true };
     } catch (err) {
-      const message = err.response?.data?.message || "Login failed";
-      set({ error: message, isLoading: false });
-      return { success: false, message };
+      const message = err.response?.data?.message || 'Login failed. Please try again.';
+      set({ isLoading: false, error: message });
+      return { success: false, error: message };
     }
   },
 
-  // ── Register ──────────────────────────────────────────
-  register: async (userData) => {
+  // ── Register ────────────────────────────────────────────
+  register: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      const { data } = await api.post("/auth/register", userData);
-      set({ isLoading: false });
-      return { success: true, message: data.message };
+      const res = await api.post('/auth/register', data);
+      set({ isLoading: false, error: null });
+      return { success: true, data: res.data };
     } catch (err) {
-      const message = err.response?.data?.message || "Registration failed";
-      set({ error: message, isLoading: false });
-      return { success: false, message };
+      const message = err.response?.data?.message || 'Registration failed.';
+      set({ isLoading: false, error: message });
+      return { success: false, error: message };
     }
   },
 
-  // ── Logout ────────────────────────────────────────────
+  // ── Logout ──────────────────────────────────────────────
   logout: async () => {
     try {
-      await api.post("/auth/logout");
-    } catch (_) {
-      // Ignore errors — clear state regardless
-    }
-    localStorage.removeItem("accessToken");
-    set({ user: null, accessToken: null, isAuthenticated: false, error: null });
+      await api.post('/auth/logout'); // clears cookie server-side
+    } catch (_) {}
+
+    // Clear ALL local state
+    localStorage.removeItem('accessToken');
+    sessionStorage.removeItem(SESSION_KEY);
+
+    set({ user: null, isAuthenticated: false, error: null, isLoading: false });
+    window.location.href = '/login';
   },
 
-  // ── Restore session on app load ───────────────────────
+  // ── Restore session on app load ─────────────────────────
+  // Called once in App.jsx useEffect on mount.
+  // Only restores if there is both a stored token AND the server confirms it.
   restoreSession: async () => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) {
+    // Already logged in this render cycle (e.g. just returned from login page)
+    if (get().user) {
       set({ isLoading: false });
       return;
     }
-    set({ isLoading: true });
-    try {
-      // First try to refresh the token silently
-      const refreshRes = await axios.post(
-        "/api/auth/refresh-token",
-        {},
-        {
-          withCredentials: true,
-        },
-      );
-      const newToken = refreshRes.data.data.accessToken;
-      localStorage.setItem("accessToken", newToken);
 
-      const { data } = await api.get("/auth/me");
+    const token = localStorage.getItem('accessToken');
+
+    // No stored token — definitely not logged in
+    if (!token) {
+      set({ isLoading: false, isAuthenticated: false });
+      return;
+    }
+
+    // Token exists — verify with server (interceptor will refresh if expired)
+    try {
+      const res = await api.get('/auth/me');
+      sessionStorage.setItem(SESSION_KEY, '1');
       set({
-        user: data.data.user,
-        accessToken: newToken,
+        user:            res.data.data.user,
         isAuthenticated: true,
-        isLoading: false,
+        isLoading:       false,
       });
     } catch (_) {
-      localStorage.removeItem("accessToken");
-      set({
-        user: null,
-        accessToken: null,
-        isAuthenticated: false,
-        isLoading: false,
-      });
+      // Server rejected even after refresh attempt — full clear
+      localStorage.removeItem('accessToken');
+      sessionStorage.removeItem(SESSION_KEY);
+      set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },
 
-  // ── Update user in store after profile edit ───────────
-  updateUser: (updates) => {
-    set((state) => ({ user: { ...state.user, ...updates } }));
-  },
+  // ── Helpers ──────────────────────────────────────────────
+  updateUser: (updates) =>
+    set((state) => ({
+      user: state.user ? { ...state.user, ...updates } : null,
+    })),
 
-  clearError: () => set({ error: null }),
+  setUser: (user) => set({ user, isAuthenticated: !!user }),
 }));
 
 export default useAuthStore;

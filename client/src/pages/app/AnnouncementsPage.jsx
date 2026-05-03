@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import useAuthStore from "../../context/useAuthStore";
 import { useSocket } from "../../context/SocketContext";
+import useIsMobile from "../../hooks/useIsMobile";
 import {
   getAnnouncements,
   getAnnouncement,
@@ -447,6 +448,7 @@ const AnnouncementCard = ({ announcement, currentUser, onRead, onDelete, onPin, 
 
 // ── Main Page ──────────────────────────────────────────────
 const AnnouncementsPage = () => {
+  const isMobile = useIsMobile();
   const { user } = useAuthStore();
   const socket   = useSocket();
 
@@ -540,10 +542,8 @@ const AnnouncementsPage = () => {
   if (detailId) return <DetailView id={detailId} currentUser={user} onBack={() => setDetailId(null)} />;
 
   return (
-    <div style={{ paddingBottom: 80, fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ paddingBottom: isMobile ? 96 : 40, fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
-        * { box-sizing: border-box; }
         textarea:focus, input:focus, select:focus { outline: none; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes slideIn { from{opacity:0;transform:translateY(-8px);} to{opacity:1;transform:translateY(0);} }
@@ -552,14 +552,14 @@ const AnnouncementsPage = () => {
       `}</style>
 
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
         <div>
-          <h1 style={s.pageTitle}>Announcements</h1>
+          <h1 style={{ ...s.pageTitle, fontSize: isMobile ? 22 : 26 }}>Announcements</h1>
           {unreadCount > 0 && <span style={s.unreadBadge}>{unreadCount} new</span>}
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {unreadCount > 0 && <button onClick={handleMarkAllRead} style={s.markAllBtn}>✓ Mark all read</button>}
-          {canPost && <button onClick={() => setShowCreate(true)} style={s.postBtn}>📢 Post</button>}
+        <div style={{ display: "flex", gap: 6 }}>
+          {unreadCount > 0 && <button onClick={handleMarkAllRead} style={{ ...s.markAllBtn, fontSize: isMobile ? 11 : 12, padding: isMobile ? '6px 8px' : '7px 12px' }}>✓ {isMobile ? 'Read' : 'Mark all read'}</button>}
+          {canPost && <button onClick={() => setShowCreate(true)} style={{ ...s.postBtn, fontSize: isMobile ? 12 : 13, padding: isMobile ? '6px 10px' : '7px 14px' }}>📢 {isMobile ? '' : 'Post'}</button>}
         </div>
       </div>
 
@@ -570,39 +570,41 @@ const AnnouncementsPage = () => {
           placeholder="Search announcements..." style={{ ...s.searchInput, paddingLeft: 42 }} />
         <button onClick={() => setShowFilters((p) => !p)}
           style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: hasActiveFilters ? "#EFF6FF" : "none", border: hasActiveFilters ? "1px solid #BFDBFE" : "none", borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: hasActiveFilters ? "#2563EB" : "#64748B", fontFamily: "'DM Sans', sans-serif" }}>
-          🎛️ Filters {hasActiveFilters && "●"}
+          🎛️ {hasActiveFilters && "●"}
         </button>
       </div>
 
       {/* Date filters */}
       {showFilters && (
-        <div style={{ background: "#F8FAFC", borderRadius: 12, padding: "14px 16px", marginBottom: 12, border: "1px solid #E2E8F0", display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div style={{ flex: 1, minWidth: 120 }}>
-            <label style={{ ...s.label, marginBottom: 4 }}>From date</label>
+        <div style={{ background: "#F8FAFC", borderRadius: 12, padding: "12px 14px", marginBottom: 12, border: "1px solid #E2E8F0", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ flex: 1, minWidth: 110 }}>
+            <label style={{ ...s.label, marginBottom: 4 }}>From</label>
             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={s.input} />
           </div>
-          <div style={{ flex: 1, minWidth: 120 }}>
-            <label style={{ ...s.label, marginBottom: 4 }}>To date</label>
+          <div style={{ flex: 1, minWidth: 110 }}>
+            <label style={{ ...s.label, marginBottom: 4 }}>To</label>
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={s.input} />
           </div>
           {(dateFrom || dateTo || search) && (
             <button onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); }}
-              style={{ padding: "9px 14px", borderRadius: 10, border: "1.5px solid #FECACA", background: "#FEF2F2", color: "#DC2626", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }}>
-              ✕ Clear filters
+              style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid #FECACA", background: "#FEF2F2", color: "#DC2626", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }}>
+              ✕ Clear
             </button>
           )}
         </div>
       )}
 
-      {/* Scope tabs */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+      {/* Scope tabs — scroll horizontally on mobile */}
+      <div style={{ display: "flex", gap: 5, marginBottom: 14, overflowX: "auto", scrollbarWidth: "none", flexWrap: isMobile ? "nowrap" : "wrap", paddingBottom: isMobile ? 4 : 0 }}>
         {[
-          { id: "all", label: "📋 All" }, { id: "university", label: "🏛️ University" },
-          { id: "faculty", label: "🏫 Faculty" }, { id: "department", label: "📚 Department" },
-          { id: "level", label: "🎓 Level" },
+          { id: "all", label: isMobile ? "All" : "📋 All" },
+          { id: "university", label: isMobile ? "Uni" : "🏛️ University" },
+          { id: "faculty", label: isMobile ? "Faculty" : "🏫 Faculty" },
+          { id: "department", label: isMobile ? "Dept" : "📚 Department" },
+          { id: "level", label: isMobile ? "Level" : "🎓 Level" },
         ].map((f) => (
           <button key={f.id} onClick={() => setScopeFilter(f.id)}
-            style={{ ...s.filterBtn, ...(scopeFilter === f.id ? s.filterActive : {}) }}>
+            style={{ ...s.filterBtn, ...(scopeFilter === f.id ? s.filterActive : {}), flexShrink: 0, fontSize: isMobile ? 11 : 12, padding: isMobile ? '5px 10px' : '6px 14px' }}>
             {f.label}
           </button>
         ))}

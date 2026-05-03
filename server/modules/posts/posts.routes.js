@@ -6,10 +6,10 @@ const validate = require('../../middleware/validate');
 const {
   createPost, getFeed, getPost, updatePost, deletePost,
   toggleLike, getComments, addComment, deleteComment,
-  getUserPosts, toggleCommentLike,
+  getUserPosts, toggleCommentLike, sharePost, savePost,
 } = require('./posts.controller');
 
-// All post routes require authentication
+// All routes require authentication
 router.use(protect);
 
 // ── Feed ──────────────────────────────────────────────────
@@ -20,27 +20,35 @@ router.get('/user/:username', getUserPosts);
 
 // ── CRUD ──────────────────────────────────────────────────
 router.post('/',
-  [body('content').optional().isLength({ max: 2000 }).withMessage('Content too long'),
-   body('feedType').optional().isIn(['social', 'academic']),
-   body('visibility').optional().isIn(['public', 'followers', 'department', 'faculty', 'private'])],
-  validate, createPost
+  [
+    body('content').optional().isLength({ max: 2000 }).withMessage('Content too long'),
+    body('feedType').optional().isIn(['social', 'academic']),
+    body('visibility').optional().isIn(['public', 'followers', 'department', 'faculty', 'private']),
+  ],
+  validate,
+  createPost
 );
 
-router.get('/:id',      getPost);
-router.patch('/:id',    updatePost);
-router.delete('/:id',   deletePost);
+router.get('/:id',    getPost);
+router.patch('/:id',  updatePost);
+router.delete('/:id', deletePost);
 
-// ── Likes ─────────────────────────────────────────────────
-router.post('/:id/like', toggleLike);
+// ── Interactions ──────────────────────────────────────────
+router.post('/:id/like',  toggleLike);
+router.post('/:id/share', sharePost);
+router.post('/:id/save',  savePost);
 
 // ── Comments ──────────────────────────────────────────────
 router.get('/:id/comments', getComments);
 router.post('/:id/comments',
-  [body('content').trim().notEmpty().withMessage('Comment cannot be empty')
-    .isLength({ max: 500 }).withMessage('Comment too long')],
-  validate, addComment
+  [
+    body('content').trim().notEmpty().withMessage('Comment cannot be empty')
+      .isLength({ max: 500 }).withMessage('Comment too long'),
+  ],
+  validate,
+  addComment
 );
-router.delete('/:id/comments/:commentId', deleteComment);
-router.post('/:id/comments/:commentId/like', toggleCommentLike);
+router.delete('/:id/comments/:commentId',      deleteComment);
+router.post('/:id/comments/:commentId/like',   toggleCommentLike);
 
 module.exports = router;
