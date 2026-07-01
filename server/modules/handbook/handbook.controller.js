@@ -1,4 +1,5 @@
 const HandbookCourse  = require('../../models/HandbookCourse');
+const User            = require('../../models/User');
 const catchAsync      = require('../../utils/catchAsync');
 const AppError        = require('../../utils/AppError');
 const { sendSuccess } = require('../../utils/apiResponse');
@@ -142,6 +143,10 @@ exports.confirmCourses = catchAsync(async (req, res, next) => {
     { new: true }
   );
   if (!handbook) return next(new AppError('Upload a handbook first.', 404));
+
+  // Mark user as having confirmed a handbook — unlocks full app access
+  await User.findByIdAndUpdate(req.user._id, { hasHandbook: true });
+
   sendSuccess(res, { message: `${courses.length} courses confirmed! Daily quiz is now active.`, data: { handbook } });
 });
 

@@ -1,10 +1,12 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import useAuthStore from '../context/useAuthStore';
 
 // ── ProtectedRoute ─────────────────────────────────────────
 // Blocks unauthenticated users — redirects to /login
+// Also forces handbook upload for users who haven't done it yet
 const ProtectedRoute = () => {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, isLoading, user } = useAuthStore();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -36,7 +38,17 @@ const ProtectedRoute = () => {
     );
   }
 
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  // Lecturers and admins skip handbook requirement
+  const handbookExempt = ['lecturer', 'admin', 'super_admin'].includes(user?.role);
+
+  // Force handbook upload for students/course_reps who haven't confirmed one yet
+  if (!handbookExempt && !user?.hasHandbook && location.pathname !== '/handbook') {
+    return <Navigate to="/handbook" replace />;
+  }
+
+  return <Outlet />;
 };
 
 export default ProtectedRoute;

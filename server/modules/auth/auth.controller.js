@@ -236,6 +236,7 @@ exports.login = catchAsync(async (req, res, next) => {
         coverUrl: user.coverUrl,
         isVerified: user.isVerified,
         badges: user.badges,
+        hasHandbook: user.hasHandbook,
       },
     },
   });

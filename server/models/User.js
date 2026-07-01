@@ -77,6 +77,9 @@ const userSchema = new mongoose.Schema(
     isActive:  { type: Boolean, default: true },
     lastSeen:  { type: Date, default: Date.now },
 
+    // ── Onboarding ────────────────────────────────────
+    hasHandbook: { type: Boolean, default: false },
+
     // ── Badges ────────────────────────────────────────
     badges: [{ type: String }],
   },

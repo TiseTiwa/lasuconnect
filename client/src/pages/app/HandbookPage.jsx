@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useIsMobile from '../../hooks/useIsMobile';
+import useAuthStore from '../../context/useAuthStore';
 import LCIcon from '../../components/LCIcon';
 import {
   getHandbook, uploadHandbook, confirmCourses,
@@ -170,8 +172,11 @@ const CourseRow = ({ course, index, onUpdate, onDelete, isMobile }) => {
 
 // ── Main page ──────────────────────────────────────────────
 const HandbookPage = () => {
-  const fileRef  = useRef(null);
-  const isMobile = useIsMobile();
+  const fileRef    = useRef(null);
+  const isMobile   = useIsMobile();
+  const navigate   = useNavigate();
+  const { user, updateUser } = useAuthStore();
+  const isMandatory = !user?.hasHandbook; // true = first-time setup
 
   const [handbook, setHandbook]     = useState(null);
   const [loading, setLoading]       = useState(true);
@@ -237,6 +242,10 @@ const HandbookPage = () => {
       const r = await confirmCourses(handbook.courses, session);
       setHandbook(r.data.data.handbook);
       setSuccess('Courses confirmed — daily quiz is now active.');
+      // Update local auth store so ProtectedRoute knows handbook is done
+      updateUser({ hasHandbook: true });
+      // Auto-navigate to feed after a brief success moment
+      setTimeout(() => navigate('/'), 1500);
     } catch (err) { setError(err.response?.data?.message || 'Failed to confirm.'); }
     setConfirming(false);
   };
@@ -253,6 +262,21 @@ const HandbookPage = () => {
   return (
     <div style={{ fontFamily: 'var(--font-body)', paddingBottom: isMobile ? 100 : 40 }}>
       {showAdd && <AddCourseModal onAdd={handleAdd} onClose={() => setShowAdd(false)} />}
+
+      {/* Mandatory onboarding banner */}
+      {isMandatory && (
+        <div style={{ background: 'linear-gradient(135deg, #0F6E56, #2563EB)', borderRadius: 'var(--radius-lg)', padding: '16px 18px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ fontSize: 24, flexShrink: 0 }}>📚</div>
+          <div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: 'white', marginBottom: 4 }}>
+              One last step before you join LASUConnect
+            </div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
+              Upload your course handbook PDF. We'll extract your courses automatically and unlock the full app for you.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
