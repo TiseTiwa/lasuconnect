@@ -61,7 +61,7 @@ const Avatar = ({ user, size = 36 }) => {
 };
 
 // ── Live Chat ──────────────────────────────────────────────
-const LiveChat = ({ streamId, currentUser, socket }) => {
+const LiveChat = ({ streamId, currentUser, socket, overlay = false }) => {
   const [messages, setMessages] = useState([]);
   const [text, setText]         = useState('');
   const bottomRef               = useRef(null);
@@ -88,12 +88,49 @@ const LiveChat = ({ streamId, currentUser, socket }) => {
     setText('');
   };
 
+  if (overlay) {
+    // TikTok-style: overlaid on video, transparent background, messages from bottom
+    return (
+      <div style={{ position: 'absolute', bottom: 60, left: 0, right: 0, pointerEvents: 'none', padding: '0 12px' }}>
+        {/* Messages */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8, maxHeight: 200, overflowY: 'hidden', justifyContent: 'flex-end' }}>
+          {messages.slice(-6).map((msg, i) => {
+            const isMe = msg.userId === currentUser._id;
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#2563EB', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: 'white', fontWeight: 700 }}>
+                  {msg.avatarUrl ? <img src={msg.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : msg.fullName?.[0]?.toUpperCase()}
+                </div>
+                <div style={{ background: 'rgba(0,0,0,0.55)', borderRadius: 12, padding: '4px 10px', backdropFilter: 'blur(4px)' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: isMe ? '#60A5FA' : 'rgba(255,255,255,0.8)', marginRight: 5 }}>{isMe ? 'You' : msg.fullName}</span>
+                  <span style={{ fontSize: 12, color: 'white' }}>{msg.message}</span>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={bottomRef} />
+        </div>
+        {/* Input — re-enable pointer events just for the form */}
+        <form onSubmit={handleSend} style={{ display: 'flex', gap: 8, pointerEvents: 'all' }}>
+          <input value={text} onChange={e => setText(e.target.value)}
+            placeholder="Say something..."
+            style={{ flex: 1, padding: '8px 14px', borderRadius: 20, border: 'none', background: 'rgba(0,0,0,0.55)', color: 'white', fontSize: 13, fontFamily: "'DM Sans', sans-serif", backdropFilter: 'blur(4px)', outline: 'none' }} />
+          <button type="submit" disabled={!text.trim()}
+            style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: text.trim() ? '#EF4444' : 'rgba(255,255,255,0.2)', color: 'white', fontSize: 14, cursor: text.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            ➤
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  // Desktop: side panel
   return (
     <div style={s.chatPanel}>
-      <div style={s.chatHeader}>💬 Live Chat</div>
+      <div style={s.chatHeader}>💬 Comments</div>
       <div style={s.chatMessages}>
         {messages.length === 0 ? (
-          <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No messages yet. Say something! 👋</div>
+          <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No comments yet. Say something! 👋</div>
         ) : messages.map((msg, i) => {
           const isMe = msg.userId === currentUser._id;
           return (
@@ -111,7 +148,7 @@ const LiveChat = ({ streamId, currentUser, socket }) => {
         <div ref={bottomRef} />
       </div>
       <form onSubmit={handleSend} style={s.chatInput}>
-        <input value={text} onChange={e => setText(e.target.value)} placeholder="Send a message..." style={s.chatInputField} />
+        <input value={text} onChange={e => setText(e.target.value)} placeholder="Add a comment..." style={s.chatInputField} />
         <button type="submit" disabled={!text.trim()} style={{ ...s.chatSendBtn, opacity: text.trim() ? 1 : 0.5 }}>➤</button>
       </form>
     </div>
@@ -196,7 +233,7 @@ const CreateStreamModal = ({ user, onClose, onCreate }) => {
 // ── LiveKit Video Grid (must be inside LiveKitRoom) ─────────
 const LiveKitVideoGrid = ({ isHost }) => {
   const tracks = useTracks(
-    [{ source: Track.Source.Camera, withPlaceholder: true },
+    [{ source: Track.Source.Camera, withPlaceholder: false },
      { source: Track.Source.ScreenShare, withPlaceholder: false }],
     { onlySubscribed: false }
   );
@@ -254,15 +291,28 @@ const LiveKitStreamRoom = ({ stream, token, serverUrl, isHost, currentUser, sock
 
   return (
     <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', height: isMobile ? 'auto' : 'calc(100vh - 100px)', gap: 16, fontFamily: "'DM Sans', sans-serif" }}>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0F172A', borderRadius: 16, overflow: 'hidden', minWidth: 0 }}>
-        {/* Info bar */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0F172A', borderRadius: 16, overflow: 'hidden', minWidth: 0, position: 'relative' }}>
+        {/* Info bar with action buttons */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'rgba(0,0,0,0.4)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={s.livePill}>🔴 LIVE</div>
             <span style={s.durationBadge}>{duration}</span>
             <span style={s.viewerBadge}>👁️ {viewerCount}</span>
           </div>
-          <div style={{ fontFamily: 'Geist, sans-serif', fontWeight: 700, fontSize: 15, color: 'white' }}>{stream.title}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontFamily: 'Geist, sans-serif', fontWeight: 700, fontSize: 15, color: 'white' }}>{stream.title}</div>
+            {isHost ? (
+              <button onClick={handleDisconnect}
+                style={{ padding: '6px 14px', borderRadius: 20, border: 'none', background: '#EF4444', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Geist, sans-serif' }}>
+                ⏹ End
+              </button>
+            ) : (
+              <button onClick={handleDisconnect}
+                style={{ padding: '6px 14px', borderRadius: 20, border: '1.5px solid rgba(255,255,255,0.3)', background: 'transparent', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Geist, sans-serif' }}>
+                ← Leave
+              </button>
+            )}
+          </div>
         </div>
 
         {/* LiveKit room — fills remaining space */}
@@ -277,19 +327,18 @@ const LiveKitStreamRoom = ({ stream, token, serverUrl, isHost, currentUser, sock
             style={{ height: '100%', background: '#0F172A' }}
           >
             <RoomAudioRenderer />
-            <div style={{ height: 'calc(100% - 52px)' }}>
+            <div style={{ height: isHost ? 'calc(100% - 52px)' : '100%' }}>
               <LiveKitVideoGrid isHost={isHost} />
             </div>
-            <ControlBar
-              variation="minimal"
-              controls={{
-                microphone: isHost,
-                camera: isHost,
-                screenShare: isHost,
-                leave: true,
-                chat: false,
-              }}
-            />
+            {isHost && (
+              <div style={{ background: 'rgba(0,0,0,0.7)', padding: '8px 16px', display: 'flex', justifyContent: 'center' }}>
+                <ControlBar
+                  variation="minimal"
+                  controls={{ microphone: true, camera: true, screenShare: true, leave: false, chat: false }}
+                  style={{ '--lk-control-bar-bg': 'transparent', color: 'white' }}
+                />
+              </div>
+            )}
           </LiveKitRoom>
         </div>
 
@@ -306,12 +355,19 @@ const LiveKitStreamRoom = ({ stream, token, serverUrl, isHost, currentUser, sock
             </span>
           </div>
         </div>
+
+        {/* Mobile: overlay chat on video */}
+        {isMobile && (
+          <LiveChat streamId={stream._id} currentUser={currentUser} socket={socket} overlay={true} />
+        )}
       </div>
 
-      {/* Chat */}
-      <div style={{ width: isMobile ? '100%' : 300, height: isMobile ? 280 : undefined, flexShrink: 0 }}>
-        <LiveChat streamId={stream._id} currentUser={currentUser} socket={socket} />
-      </div>
+      {/* Desktop: side chat panel */}
+      {!isMobile && (
+        <div style={{ width: 300, flexShrink: 0 }}>
+          <LiveChat streamId={stream._id} currentUser={currentUser} socket={socket} overlay={false} />
+        </div>
+      )}
     </div>
   );
 };
@@ -539,6 +595,15 @@ const LivePage = () => {
         @keyframes spin  { to { transform: rotate(360deg); } }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
         @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .lk-button { background: rgba(255,255,255,0.15) !important; color: white !important; border: 1.5px solid rgba(255,255,255,0.25) !important; border-radius: 10px !important; }
+        .lk-button:hover { background: rgba(255,255,255,0.28) !important; }
+        .lk-button svg { color: white !important; fill: white !important; }
+        .lk-control-bar { background: transparent !important; gap: 8px !important; }
+        .lk-media-device-select { background: #1E293B !important; border: 1px solid rgba(255,255,255,0.15) !important; border-radius: 12px !important; padding: 6px !important; box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important; min-width: 220px !important; overflow: hidden !important; }
+        .lk-media-device-select li { padding: 10px 14px !important; color: white !important; font-family: 'DM Sans', sans-serif !important; font-size: 13px !important; border-radius: 8px !important; cursor: pointer !important; transition: background 0.15s !important; list-style: none !important; }
+        .lk-media-device-select li:hover { background: rgba(255,255,255,0.1) !important; }
+        .lk-media-device-select li[aria-selected="true"] { background: #2563EB !important; font-weight: 600 !important; }
+        .lk-media-device-select li[aria-selected="true"]::before { content: '✓ ' !important; }
       `}</style>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: isMobile ? 14 : 20 }}>
