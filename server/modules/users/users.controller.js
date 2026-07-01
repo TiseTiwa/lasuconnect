@@ -86,7 +86,8 @@ exports.searchUsers = catchAsync(async (req, res, next) => {
   const { q, page = 1, limit = 20 } = req.query;
   if (!q?.trim()) return next(new AppError('Search query is required.', 400));
   const skip = (parseInt(page) - 1) * parseInt(limit);
-  const regex = new RegExp(q.trim(), 'i');
+  const escaped = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(escaped, 'i');
   const users = await User.find({ isActive: true, $or: [{ fullName: regex }, { username: regex }, { department: regex }, { faculty: regex }] })
     .select('fullName username avatarUrl department faculty level badges isVerified followers').skip(skip).limit(parseInt(limit)).lean();
   sendSuccess(res, { data: { users: users.map(u => ({ ...u, followersCount: u.followers?.length || 0, isFollowing: u.followers?.some(id => id.toString() === req.user._id.toString()) || false, followers: undefined })) } });

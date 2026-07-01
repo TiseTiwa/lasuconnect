@@ -125,7 +125,7 @@ exports.toggleLike = catchAsync(async (req, res, next) => {
 
 exports.getComments = catchAsync(async (req, res, next) => {
   const comments = await Comment.find({
-    post: req.params.id,
+    reel: req.params.id,
     isDeleted: false,
     parentComment: null,
   })
@@ -143,7 +143,7 @@ exports.addComment = catchAsync(async (req, res, next) => {
   const reel = await Reel.findOne({ _id: req.params.id, isDeleted: false });
   if (!reel) return next(new AppError("Reel not found.", 404));
   const comment = await Comment.create({
-    post: req.params.id,
+    reel: req.params.id,
     author: req.user._id,
     content: content.trim(),
   });

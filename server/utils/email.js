@@ -3,14 +3,17 @@ const logger = require('./logger');
 
 // ── Create reusable transporter ───────────────────────────
 const createTransporter = () => {
+  const port = parseInt(process.env.SMTP_PORT) || 465;
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: false, // TLS
+    port,
+    secure: port === 465,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
   });
 };
 

@@ -52,6 +52,8 @@ exports.getFeed = catchAsync(async (req, res, next) => {
   query.$or = [
     { visibility: 'public' },
     { visibility: 'followers', author: { $in: [...followingIds, req.user._id] } },
+    { visibility: 'department', author: { $in: await User.find({ department: user.department }).distinct('_id') } },
+    { visibility: 'faculty',    author: { $in: await User.find({ faculty: user.faculty }).distinct('_id') } },
     { author: req.user._id },
   ];
   const [posts, total] = await Promise.all([

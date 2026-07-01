@@ -237,6 +237,7 @@ const PostCard = ({ post, currentUserId }) => {
 const PostComposer = ({ user, onPost }) => {
   const [text, setText]             = useState("");
   const [feedType, setFeedType]     = useState("social");
+  const [visibility, setVisibility] = useState("public");
   const [expanded, setExpanded]     = useState(false);
   const [error, setError]           = useState("");
   const [previews, setPreviews]     = useState([]);
@@ -269,8 +270,8 @@ const PostComposer = ({ user, onPost }) => {
         mediaUrls = uploadData.mediaUrls;
         mediaType = uploadData.mediaType;
       }
-      const res = await createPost({ content: text.trim(), feedType, mediaUrls, mediaType });
-      setText(""); setMediaFiles([]); setPreviews([]); setExpanded(false);
+      const res = await createPost({ content: text.trim(), feedType, visibility, mediaUrls, mediaType });
+      setText(""); setMediaFiles([]); setPreviews([]); setExpanded(false); setVisibility("public");
       onPost(res.data.data.post);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Failed to post. Try again.");
@@ -340,6 +341,12 @@ const PostComposer = ({ user, onPost }) => {
             <button style={cs.composerBtn}>😂 Meme</button>
           </div>
           <div style={cs.composerRight}>
+            <select value={visibility} onChange={(e) => setVisibility(e.target.value)} style={cs.feedSelect}>
+              <option value="public">🌐 Everyone</option>
+              <option value="followers">👥 Followers</option>
+              <option value="department">🏛️ Department</option>
+              <option value="faculty">🎓 Faculty</option>
+            </select>
             <select value={feedType} onChange={(e) => setFeedType(e.target.value)} style={cs.feedSelect}>
               <option value="social">🌐 Social</option>
               <option value="academic">🎓 Academic</option>
@@ -543,8 +550,8 @@ const s = {
   commentsSection:{ marginTop: "12px", paddingTop: "12px", borderTop: "0.5px solid var(--border)", display: "flex", flexDirection: "column", gap: "10px" },
   commentItem:    { display: "flex", gap: "8px", alignItems: "flex-start" },
   commentBubble:  { background: "var(--bg-elevated)", borderRadius: "0 var(--radius-md) var(--radius-md) var(--radius-md)", padding: "8px 12px", flex: 1 },
-  commentAuthor:  { fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "12px", color: "var(--text-primary)" },
-  commentText:    { fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5 },
+  commentAuthor:  { fontFamily: "var(--font-display)", fontWeight: 700, fontSize: "12px", color: "var(--text-primary)", marginRight: "5px" },
+  commentText:    { fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5, marginRight: "6px" },
   commentTime:    { fontSize: "11px", color: "var(--text-tertiary)" },
   commentForm:    { display: "flex", gap: "8px", alignItems: "center" },
   commentInput:   { flex: 1, padding: "8px 14px", border: "1.5px solid var(--border-sec)", borderRadius: "var(--radius-full)", fontSize: "13px", background: "var(--bg-input)", color: "var(--text-primary)", fontFamily: "var(--font-body)" },

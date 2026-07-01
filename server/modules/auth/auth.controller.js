@@ -147,11 +147,14 @@ exports.register = catchAsync(async (req, res, next) => {
     isVerified: isDev, // email verification — auto in dev
   });
 
-  // ── Send verification email ────────────────────────────
-  try {
-    await sendVerificationEmail(user.email, verificationToken);
-  } catch (_) {
-    // Non-fatal — user can resend
+  // ── Send verification email (skip in dev — user is auto-verified) ──
+  if (!isDev) {
+    try {
+      const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
+      await sendVerificationEmail({ to: user.email, fullName: user.fullName, verificationUrl });
+    } catch (_) {
+      // Non-fatal — user can resend
+    }
   }
 
   sendSuccess(res, {
@@ -323,7 +326,12 @@ exports.resendVerification = catchAsync(async (req, res, next) => {
   user.verificationToken = token;
   await user.save({ validateBeforeSave: false });
 
-  await sendVerificationEmail(user.email, token);
+  const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${token}`;
+  try {
+    await sendVerificationEmail({ to: user.email, fullName: user.fullName, verificationUrl });
+  } catch (emailErr) {
+    return next(new AppError("Failed to send verification email. Please try again later.", 500));
+  }
   sendSuccess(res, { message: "Verification email resent." });
 });
 
@@ -336,10 +344,19 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
 
   const token = crypto.randomBytes(32).toString("hex");
   user.resetToken = token;
-  user.resetTokenExpiry = Date.now() + 60 * 60 * 1000; // 1 hour
+  user.resetTokenExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes
   await user.save({ validateBeforeSave: false });
 
-  await sendPasswordResetEmail(user.email, token);
+  const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
+  try {
+    await sendPasswordResetEmail({ to: user.email, fullName: user.fullName, resetUrl });
+  } catch (emailErr) {
+    // Roll back token so the user can try again once SMTP is fixed
+    user.resetToken = undefined;
+    user.resetTokenExpiry = undefined;
+    await user.save({ validateBeforeSave: false });
+    return next(new AppError("Failed to send reset email. Please try again later.", 500));
+  }
   sendSuccess(res, { message: "Password reset email sent." });
 });
 
