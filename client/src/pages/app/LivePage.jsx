@@ -236,11 +236,14 @@ const BroadcasterView = ({ stream, currentUser, socket, onEnd }) => {
     return () => socket.off('stream:viewer_count', onViewerCount);
   }, [socket]);
 
+  const startedAtRef = useRef(null);
+
   // Duration ticker
   useEffect(() => {
     if (!isLive) return;
+    startedAtRef.current = stream.startedAt ? new Date(stream.startedAt) : new Date();
     durationRef.current = setInterval(() => {
-      setDuration(formatDuration(stream.startedAt || new Date()));
+      setDuration(formatDuration(startedAtRef.current));
     }, 1000);
     return () => clearInterval(durationRef.current);
   }, [isLive]);
@@ -398,25 +401,34 @@ const BroadcasterView = ({ stream, currentUser, socket, onEnd }) => {
 // ── Viewer View ────────────────────────────────────────────
 const ViewerView = ({ stream, currentUser, socket, onLeave }) => {
   const isMobile = useIsMobile();
-  const videoRef      = useRef(null);
-  const mediaSourceRef = useRef(null);
+  const videoRef        = useRef(null);
+  const mediaSourceRef  = useRef(null);
   const sourceBufferRef = useRef(null);
-  const queueRef      = useRef([]);
+  const queueRef        = useRef([]);      // chunks waiting to be appended
+  const preQueueRef     = useRef([]);      // chunks that arrived before SourceBuffer was ready
+  const sbReadyRef      = useRef(false);
   const [viewerCount, setViewerCount] = useState(stream.viewerCount || 0);
   const [streamEnded, setStreamEnded] = useState(false);
   const [duration, setDuration]       = useState('00:00');
   const [buffering, setBuffering]     = useState(true);
   const [error, setError]             = useState('');
 
+  const appendBuffer = useCallback((buffer) => {
+    const sb = sourceBufferRef.current;
+    if (!sb || !sbReadyRef.current) { preQueueRef.current.push(buffer); return; }
+    if (sb.updating || queueRef.current.length > 0) {
+      queueRef.current.push(buffer);
+    } else {
+      try { sb.appendBuffer(buffer); } catch (_) {}
+    }
+  }, []);
+
   useEffect(() => {
-    // Join stream room
     socket?.emit('stream:join', { streamId: stream._id, userId: currentUser._id });
     joinStream(stream._id).catch(() => {});
 
-    // Duration ticker
     const ticker = setInterval(() => setDuration(formatDuration(stream.startedAt)), 1000);
 
-    // Setup MediaSource for video playback
     if ('MediaSource' in window) {
       const ms = new MediaSource();
       mediaSourceRef.current = ms;
@@ -436,7 +448,15 @@ const ViewerView = ({ stream, currentUser, socket, onLeave }) => {
             setBuffering(false);
           });
 
-          // Play when buffer is ready
+          // Flush any chunks that arrived before SourceBuffer was ready
+          sbReadyRef.current = true;
+          if (preQueueRef.current.length > 0) {
+            const first = preQueueRef.current.shift();
+            queueRef.current.push(...preQueueRef.current);
+            preQueueRef.current = [];
+            try { sb.appendBuffer(first); } catch (_) {}
+          }
+
           videoRef.current?.play().catch(() => {});
         } catch (err) {
           setError('Your browser may not support this stream format.');
@@ -457,15 +477,15 @@ const ViewerView = ({ stream, currentUser, socket, onLeave }) => {
   useEffect(() => {
     if (!socket) return;
 
-    const onChunk = ({ chunk }) => {
-      const sb = sourceBufferRef.current;
-      if (!sb) return;
+    // init segment sent by server when a late viewer joins
+    const onInit = ({ chunk }) => {
       const buffer = chunk instanceof ArrayBuffer ? chunk : new Uint8Array(chunk).buffer;
-      if (sb.updating || queueRef.current.length > 0) {
-        queueRef.current.push(buffer);
-      } else {
-        try { sb.appendBuffer(buffer); } catch (_) {}
-      }
+      appendBuffer(buffer);
+    };
+
+    const onChunk = ({ chunk }) => {
+      const buffer = chunk instanceof ArrayBuffer ? chunk : new Uint8Array(chunk).buffer;
+      appendBuffer(buffer);
     };
 
     const onViewerCount = ({ viewerCount: vc }) => setViewerCount(vc);
@@ -475,16 +495,18 @@ const ViewerView = ({ stream, currentUser, socket, onLeave }) => {
       mediaSourceRef.current?.endOfStream?.();
     };
 
-    socket.on('stream:chunk', onChunk);
+    socket.on('stream:init',         onInit);
+    socket.on('stream:chunk',        onChunk);
     socket.on('stream:viewer_count', onViewerCount);
-    socket.on('stream:ended', onEnded);
+    socket.on('stream:ended',        onEnded);
 
     return () => {
-      socket.off('stream:chunk', onChunk);
+      socket.off('stream:init',         onInit);
+      socket.off('stream:chunk',        onChunk);
       socket.off('stream:viewer_count', onViewerCount);
-      socket.off('stream:ended', onEnded);
+      socket.off('stream:ended',        onEnded);
     };
-  }, [socket]);
+  }, [socket, appendBuffer]);
 
   const cat = getCategoryConfig(stream.category);
 

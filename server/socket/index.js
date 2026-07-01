@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const initSocket = (io) => {
   const onlineUsers   = new Map(); // userId → socketId
   const streamViewers = new Map(); // streamId → Set of socketIds
+  const initSegments  = new Map(); // streamId → ArrayBuffer (first chunk with WebM headers)
 
   io.on('connection', (socket) => {
     logger.info(`🔌 Socket connected: ${socket.id}`);
@@ -52,6 +53,11 @@ const initSocket = (io) => {
       if (!streamViewers.has(streamId)) streamViewers.set(streamId, new Set());
       streamViewers.get(streamId).add(socket.id);
 
+      // Send cached init segment so late joiners can decode video
+      if (initSegments.has(streamId)) {
+        socket.emit('stream:init', { streamId, chunk: initSegments.get(streamId) });
+      }
+
       // Tell host a viewer joined
       socket.to(`stream:${streamId}`).emit('stream:viewer_joined', {
         userId,
@@ -73,7 +79,11 @@ const initSocket = (io) => {
     // ── VIDEO CHUNK RELAY ─────────────────────────────────
     // Host sends binary video chunk → server relays to all viewers in room
     socket.on('stream:chunk', ({ streamId, chunk }) => {
-      // Only relay from the host — broadcast to everyone else in the room
+      // Cache the first chunk — it contains the WebM init segment (headers)
+      // Late joiners need this to decode the stream
+      if (!initSegments.has(streamId)) {
+        initSegments.set(streamId, chunk);
+      }
       socket.to(`stream:${streamId}`).emit('stream:chunk', { streamId, chunk });
     });
 
@@ -93,6 +103,7 @@ const initSocket = (io) => {
     socket.on('stream:end', ({ streamId }) => {
       io.to(`stream:${streamId}`).emit('stream:ended', { streamId });
       streamViewers.delete(streamId);
+      initSegments.delete(streamId);
       logger.info(`🔴 Stream ${streamId} ended`);
     });
 
