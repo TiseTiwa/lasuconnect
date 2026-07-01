@@ -282,7 +282,7 @@ const AppLayout = () => {
         {/* ── Left Sidebar (desktop only) ── */}
         <aside className="lc-sidebar">
           {/* Logo */}
-          <div style={{ marginBottom: 24, padding: "4px 0" }}>
+          <div style={{ marginBottom: 24, padding: "4px 0", cursor: "pointer" }} onClick={() => navigate("/")}>
             <LASULogo size={38} withText textSize={17} />
           </div>
 
@@ -343,7 +343,9 @@ const AppLayout = () => {
         }}>
           {/* Mobile-only header */}
           <div className="lc-mobile-header">
-            <LASULogo size={30} withText textSize={14} />
+            <div style={{ cursor: "pointer" }} onClick={() => navigate("/")}>
+              <LASULogo size={30} withText textSize={14} />
+            </div>
             <ThemeToggle compact />
           </div>
 
