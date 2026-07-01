@@ -326,11 +326,11 @@ const LiveKitStreamRoom = ({ stream, token, serverUrl, isHost, currentUser, sock
             serverUrl={serverUrl}
             connect={true}
             video={isHost}
-            audio={isHost}
+            audio={true}
             onDisconnected={handleLeaveStream}
             style={{ height: '100%', background: '#0F172A' }}
           >
-            <RoomAudioRenderer />
+            <RoomAudioRenderer volume={1.0} />
             <div style={{ height: isHost ? 'calc(100% - 52px)' : '100%' }}>
               <LiveKitVideoGrid isHost={isHost} />
             </div>
