@@ -294,7 +294,7 @@ const BroadcasterView = ({ stream, currentUser, socket, onEnd }) => {
         }
       };
 
-      recorder.start(250); // 250ms chunks — smaller, more frequent, less likely to exceed buffer limit
+      recorder.start(100); // 100ms chunks for near real-time latency
       recorderRef.current = recorder;
       setIsLive(true);
     } catch (err) {
@@ -307,18 +307,21 @@ const BroadcasterView = ({ stream, currentUser, socket, onEnd }) => {
   const handleEndStream = async () => {
     if (!window.confirm('Are you sure you want to end the stream?')) return;
 
-    // Stop recorder
-    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-      recorderRef.current.stop();
-    }
+    // B-4 fix: wait for recorder to flush its final chunk before ending
+    await new Promise(resolve => {
+      const recorder = recorderRef.current;
+      if (!recorder || recorder.state === 'inactive') { resolve(); return; }
+      recorder.onstop = resolve;
+      recorder.stop();
+    });
 
-    // Stop camera
+    // Stop camera/mic tracks
     mediaRef.current?.getTracks().forEach(t => t.stop());
 
-    // Tell socket
+    // Tell socket — fires AFTER final chunk is sent
     socket?.emit('stream:end', { streamId: stream._id });
 
-    // API call
+    // REST call to mark DB ended
     await endStream(stream._id).catch(() => {});
     clearInterval(durationRef.current);
     onEnd();
@@ -410,9 +413,12 @@ const ViewerView = ({ stream, currentUser, socket, onLeave }) => {
   const videoRef        = useRef(null);
   const mediaSourceRef  = useRef(null);
   const sourceBufferRef = useRef(null);
-  const queueRef        = useRef([]);      // chunks waiting to be appended
-  const preQueueRef     = useRef([]);      // chunks that arrived before SourceBuffer was ready
+  const blobUrlRef      = useRef(null);  // V-1: track blob URL for cleanup
+  const liveEdgeTimerRef = useRef(null); // V-7/V-8: use ref instead of DOM property
+  const queueRef        = useRef([]);
+  const preQueueRef     = useRef([]);
   const sbReadyRef      = useRef(false);
+  const isRemoving      = useRef(false);
   const [viewerCount, setViewerCount] = useState(stream.viewerCount || 0);
   const [streamEnded, setStreamEnded] = useState(false);
   const [duration, setDuration]       = useState('00:00');
@@ -423,97 +429,163 @@ const ViewerView = ({ stream, currentUser, socket, onLeave }) => {
     if (chunk instanceof ArrayBuffer) return chunk;
     if (chunk instanceof Uint8Array) return chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength);
     if (Array.isArray(chunk)) return new Uint8Array(chunk).buffer;
-    return new Uint8Array(Object.values(chunk)).buffer;
+    if (chunk && typeof chunk === 'object') return new Uint8Array(Object.values(chunk)).buffer;
+    return new ArrayBuffer(0);
   };
 
-  const appendBuffer = useCallback((chunk) => {
-    const buffer = toArrayBuffer(chunk);
+  const processQueue = useCallback(() => {
     const sb = sourceBufferRef.current;
-    if (!sb || !sbReadyRef.current) { preQueueRef.current.push(buffer); return; }
-    if (sb.updating || queueRef.current.length > 0) {
-      queueRef.current.push(buffer);
-    } else {
-      try { sb.appendBuffer(buffer); } catch (_) {}
+    const video = videoRef.current;
+    if (!sb || sb.updating || isRemoving.current) return;
+
+    // Trim old buffer — keep only last 8 seconds
+    if (sb.buffered.length > 0) {
+      const bufStart = sb.buffered.start(0);
+      const bufEnd   = sb.buffered.end(sb.buffered.length - 1);
+      if (bufEnd - bufStart > 8) {
+        isRemoving.current = true;
+        try { sb.remove(bufStart, bufEnd - 8); } catch (_) { isRemoving.current = false; }
+        return;
+      }
+    }
+
+    // Drop stale queued chunks if queue backs up (> 10 chunks = too far behind)
+    while (queueRef.current.length > 10) queueRef.current.shift();
+
+    if (queueRef.current.length === 0) return;
+
+    const next = queueRef.current.shift();
+    try {
+      sb.appendBuffer(next);
+      setBuffering(false);
+    } catch (e) {
+      // Put it back if quota exceeded — will retry after trim
+      if (e.name === 'QuotaExceededError') queueRef.current.unshift(next);
     }
   }, []);
 
+  const appendBuffer = useCallback((chunk) => {
+    const buffer = toArrayBuffer(chunk);
+    if (!buffer.byteLength) return;
+    if (!sbReadyRef.current) { preQueueRef.current.push(buffer); return; }
+    queueRef.current.push(buffer);
+    processQueue();
+  }, [processQueue]);
+
+  // Single combined effect
   useEffect(() => {
-    socket?.emit('stream:join', { streamId: stream._id, userId: currentUser._id });
+    if (!socket) return;
+
+    socket.emit('stream:join', { streamId: stream._id, userId: currentUser._id });
     joinStream(stream._id).catch(() => {});
 
     const ticker = setInterval(() => setDuration(formatDuration(stream.startedAt)), 1000);
 
-    if ('MediaSource' in window) {
-      const ms = new MediaSource();
-      mediaSourceRef.current = ms;
-      if (videoRef.current) videoRef.current.src = URL.createObjectURL(ms);
-
-      ms.addEventListener('sourceopen', () => {
-        try {
-          const mimeType = MediaSource.isTypeSupported('video/webm;codecs=vp9')
-            ? 'video/webm;codecs=vp9' : 'video/webm';
-          const sb = ms.addSourceBuffer(mimeType);
-          sourceBufferRef.current = sb;
-
-          sb.addEventListener('updateend', () => {
-            if (queueRef.current.length > 0 && !sb.updating) {
-              sb.appendBuffer(queueRef.current.shift());
-            }
-            setBuffering(false);
-          });
-
-          // Flush any chunks that arrived before SourceBuffer was ready
-          sbReadyRef.current = true;
-          if (preQueueRef.current.length > 0) {
-            const first = preQueueRef.current.shift();
-            queueRef.current.push(...preQueueRef.current);
-            preQueueRef.current = [];
-            try { sb.appendBuffer(first); } catch (_) {}
-          }
-
-          videoRef.current?.play().catch(() => {});
-        } catch (err) {
-          setError('Your browser may not support this stream format.');
-        }
-      });
-    } else {
-      setError('Live streaming requires a modern browser (Chrome, Edge, Firefox).');
-    }
-
-    return () => {
-      clearInterval(ticker);
-      socket?.emit('stream:leave', { streamId: stream._id, userId: currentUser._id });
-      leaveStream(stream._id).catch(() => {});
-    };
-  }, [stream._id]);
-
-  // Socket listeners
-  useEffect(() => {
-    if (!socket) return;
-
-    // init segment sent by server when a late viewer joins
-    const onInit = ({ chunk }) => appendBuffer(chunk);
+    const onInit  = ({ chunk }) => appendBuffer(chunk);
     const onChunk = ({ chunk }) => appendBuffer(chunk);
-
     const onViewerCount = ({ viewerCount: vc }) => setViewerCount(vc);
-
-    const onEnded = () => {
-      setStreamEnded(true);
-      mediaSourceRef.current?.endOfStream?.();
-    };
+    const onEnded = () => { setStreamEnded(true); mediaSourceRef.current?.endOfStream?.(); };
 
     socket.on('stream:init',         onInit);
     socket.on('stream:chunk',        onChunk);
     socket.on('stream:viewer_count', onViewerCount);
     socket.on('stream:ended',        onEnded);
 
+    if (!('MediaSource' in window)) {
+      setError('Live streaming requires a modern browser (Chrome, Edge, Firefox).');
+    } else {
+      const ms = new MediaSource();
+      mediaSourceRef.current = ms;
+      // V-1 fix: store blob URL in ref so we can revoke it on cleanup
+      const blobUrl = URL.createObjectURL(ms);
+      blobUrlRef.current = blobUrl;
+      if (videoRef.current) videoRef.current.src = blobUrl;
+
+      ms.addEventListener('sourceopen', () => {
+        try {
+          const mimeType = MediaSource.isTypeSupported('video/webm;codecs=vp8,opus')
+            ? 'video/webm;codecs=vp8,opus'
+            : MediaSource.isTypeSupported('video/webm;codecs=vp9')
+            ? 'video/webm;codecs=vp9'
+            : 'video/webm';
+
+          const sb = ms.addSourceBuffer(mimeType);
+          sourceBufferRef.current = sb;
+
+          sb.addEventListener('updateend', () => {
+            isRemoving.current = false;
+            const video = videoRef.current;
+            if (video && sb.buffered.length > 0) {
+              const liveEdge = sb.buffered.end(sb.buffered.length - 1);
+              if (liveEdge - video.currentTime > 1.5) {
+                video.currentTime = liveEdge - 0.5;
+              }
+              if (video.paused && video.readyState >= 2) {
+                video.play().catch(() => {});
+              }
+            }
+            processQueue();
+          });
+
+          // Flush pre-queue
+          sbReadyRef.current = true;
+          const queued = preQueueRef.current.splice(0);
+          queueRef.current.push(...queued);
+          processQueue();
+
+          videoRef.current?.play().catch(() => {});
+
+          // V-9 fix: handle stall/waiting events — show buffering and snap to live edge
+          const onStall = () => {
+            setBuffering(true);
+            const video = videoRef.current;
+            if (!video || !sb.buffered.length) return;
+            const liveEdge = sb.buffered.end(sb.buffered.length - 1);
+            if (liveEdge - video.currentTime > 1) {
+              video.currentTime = liveEdge - 0.5;
+            }
+            video.play().catch(() => {});
+          };
+          const onPlaying = () => setBuffering(false);
+          videoRef.current?.addEventListener('stalled', onStall);
+          videoRef.current?.addEventListener('waiting', onStall);
+          videoRef.current?.addEventListener('playing', onPlaying);
+
+          // V-7/V-8 fix: store interval in ref, not on DOM object
+          liveEdgeTimerRef.current = setInterval(() => {
+            const video = videoRef.current;
+            if (!video || !sb || !sb.buffered.length) return;
+            const liveEdge = sb.buffered.end(sb.buffered.length - 1);
+            if (liveEdge - video.currentTime > 3) {
+              video.currentTime = liveEdge - 1;
+            }
+            if (video.paused && video.readyState >= 2) {
+              video.play().catch(() => {});
+            }
+          }, 1500);
+
+        } catch (err) {
+          setError('Your browser may not support this stream format.');
+        }
+      });
+    }
+
     return () => {
+      clearInterval(ticker);
+      clearInterval(liveEdgeTimerRef.current); // V-7/V-8 fix
+      // V-1 fix: revoke the blob URL
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
       socket.off('stream:init',         onInit);
       socket.off('stream:chunk',        onChunk);
       socket.off('stream:viewer_count', onViewerCount);
       socket.off('stream:ended',        onEnded);
+      socket.emit('stream:leave', { streamId: stream._id, userId: currentUser._id });
+      leaveStream(stream._id).catch(() => {});
     };
-  }, [socket, appendBuffer]);
+  }, [socket, stream._id, appendBuffer, processQueue]);
 
   const cat = getCategoryConfig(stream.category);
 
@@ -566,6 +638,23 @@ const ViewerView = ({ stream, currentUser, socket, onLeave }) => {
               </div>
             </div>
           )}
+        </div>
+
+        {/* U-1 fix: viewer controls — volume, mute, fullscreen */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(0,0,0,0.6)' }}>
+          <button
+            onClick={() => { if (videoRef.current) videoRef.current.muted = !videoRef.current.muted; }}
+            style={{ ...s.controlBtn, background: 'rgba(255,255,255,0.15)', fontSize: 13 }}>
+            🔊 Sound
+          </button>
+          <input type="range" min="0" max="1" step="0.05" defaultValue="1"
+            onChange={e => { if (videoRef.current) videoRef.current.volume = e.target.value; }}
+            style={{ flex: 1, accentColor: '#2563EB' }} />
+          <button
+            onClick={() => videoRef.current?.requestFullscreen?.()}
+            style={{ ...s.controlBtn, background: 'rgba(255,255,255,0.15)', fontSize: 13 }}>
+            ⛶ Full
+          </button>
         </div>
 
         {/* Stream info below video */}
