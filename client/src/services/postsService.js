@@ -32,9 +32,9 @@ export const deleteComment = (postId, commentId) =>
 export const likeComment = (postId, commentId) =>
   api.post(`/posts/${postId}/comments/${commentId}/like`);
 
-// ── Shares ────────────────────────────────────────────────
-export const sharePost = (postId) =>
-  api.post(`/posts/${postId}/share`);
+// ── Shares / Reposts ──────────────────────────────────────
+export const repostPost = (postId, quote = '') =>
+  api.post(`/posts/${postId}/share`, { quote });
 
 // ── Saves / bookmarks ─────────────────────────────────────
 export const savePost = (postId) =>

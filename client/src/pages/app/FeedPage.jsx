@@ -6,7 +6,7 @@ import { useTheme } from "../../context/ThemeContext";
 import useIsMobile from "../../hooks/useIsMobile";
 import { FeedGate, StreakWidget } from "../../components/AcademicComponents";
 import {
-  getFeed, createPost, toggleLike, getComments, addComment,
+  getFeed, createPost, toggleLike, getComments, addComment, repostPost,
 } from "../../services/postsService";
 
 // ── Time formatter ─────────────────────────────────────────
@@ -52,12 +52,17 @@ const PostCard = ({ post, currentUserId }) => {
 
   const [liked, setLiked]               = useState(post.isLiked);
   const [likeCount, setLikeCount]       = useState(post.likesCount);
+  const [shareCount, setShareCount]     = useState(post.sharesCount || 0);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments]         = useState([]);
   const [commentText, setCommentText]   = useState("");
   const [loadingComments, setLoadingComments] = useState(false);
   const [submitting, setSubmitting]     = useState(false);
   const [copied, setCopied]             = useState(false);
+  const [showRepostMenu, setShowRepostMenu] = useState(false);
+  const [showQuoteBox, setShowQuoteBox] = useState(false);
+  const [quoteText, setQuoteText]       = useState("");
+  const [reposting, setReposting]       = useState(false);
 
   const handleLike = async () => {
     setLiked((p) => !p);
@@ -96,6 +101,20 @@ const PostCard = ({ post, currentUserId }) => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  };
+
+  const handleRepost = async (quote = '') => {
+    setReposting(true);
+    try {
+      await repostPost(post._id, quote);
+      setShareCount(p => p + 1);
+      setShowRepostMenu(false);
+      setShowQuoteBox(false);
+      setQuoteText('');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Could not repost.');
+    }
+    setReposting(false);
   };
 
   // Fix 4: removed shareCount — backend doesn't track it yet
@@ -145,6 +164,13 @@ const PostCard = ({ post, currentUserId }) => {
     <div style={s.postCard}>
       {post.isPinned && <div style={s.pinnedBadge}>📌 Pinned</div>}
 
+      {/* Repost header — show who reposted */}
+      {post.isRepost && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px 0', fontSize: 12, color: 'var(--text-tertiary)', fontWeight: 600 }}>
+          🔁 {post.author?.fullName?.split(' ')[0]} reposted
+        </div>
+      )}
+
       <div style={s.postHeader}>
         {/* Fix 3: avatar navigates to profile */}
         <div onClick={() => navigate(`/profile/${post.author?.username}`)} style={{ cursor: "pointer" }}>
@@ -171,12 +197,34 @@ const PostCard = ({ post, currentUserId }) => {
 
       {/* Fix 2: content navigates to post detail */}
       {post.content && (
-        <p
-          onClick={() => navigate(`/post/${post._id}`)}
-          style={{ ...s.postContent, cursor: "pointer" }}
-        >
+        <p onClick={() => navigate(`/post/${post._id}`)} style={{ ...s.postContent, cursor: "pointer" }}>
           {post.content}
         </p>
+      )}
+
+      {/* Embedded original post for reposts */}
+      {post.isRepost && post.repostOf && (
+        <div onClick={() => navigate(`/post/${post.repostOf._id}`)} style={{ margin: '0 14px 10px', border: '1.5px solid var(--border)', borderRadius: 12, padding: '12px 14px', background: 'var(--bg-elevated)', cursor: 'pointer' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 11, fontWeight: 700, overflow: 'hidden', flexShrink: 0 }}>
+              {post.repostOf.author?.avatarUrl
+                ? <img src={post.repostOf.author.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : post.repostOf.author?.fullName?.[0]?.toUpperCase()}
+            </div>
+            <div>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>{post.repostOf.author?.fullName}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>@{post.repostOf.author?.username}</span>
+            </div>
+          </div>
+          {post.repostOf.content && (
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+              {post.repostOf.content.slice(0, 200)}{post.repostOf.content.length > 200 ? '...' : ''}
+            </p>
+          )}
+          {post.repostOf.mediaUrls?.length > 0 && (
+            <img src={post.repostOf.mediaUrls[0]} alt="" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, marginTop: 8 }} />
+          )}
+        </div>
       )}
 
       {/* Fix 2: media also navigates to post detail */}
@@ -202,15 +250,55 @@ const PostCard = ({ post, currentUserId }) => {
         <button onClick={handleToggleComments} style={s.actionBtn}>
           💬 <span>{post.commentsCount}</span>
         </button>
-        {/* Fix 4: no share count shown */}
-        <button onClick={handleShare} style={s.actionBtn}>
-          🔁 Share
-        </button>
+
+        {/* Repost button — Twitter-style */}
+        {!post.isRepost && (
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setShowRepostMenu(p => !p)}
+              style={{ ...s.actionBtn, color: shareCount > 0 ? '#10B981' : '#64748B' }}>
+              🔁 <span>{shareCount > 0 ? shareCount : ''}</span>
+            </button>
+
+            {showRepostMenu && (
+              <div style={{ position: 'absolute', bottom: '110%', left: 0, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: 6, zIndex: 50, minWidth: 160 }}>
+                <button onClick={() => handleRepost('')} disabled={reposting}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  🔁 Repost
+                </button>
+                <button onClick={() => { setShowQuoteBox(true); setShowRepostMenu(false); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                  ✏️ Quote
+                </button>
+                <button onClick={() => setShowRepostMenu(false)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text-tertiary)' }}>
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <button onClick={handleCopyLink}
           style={{ ...s.actionBtn, marginLeft: "auto", color: copied ? "#10B981" : "#64748B" }}>
           {copied ? "✅" : "🔗"}
         </button>
       </div>
+
+      {/* Quote repost box */}
+      {showQuoteBox && (
+        <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)' }}>
+          <textarea value={quoteText} onChange={e => setQuoteText(e.target.value)}
+            placeholder="Add a comment and repost..."
+            style={{ width: '100%', border: '1.5px solid var(--border)', borderRadius: 10, padding: '8px 12px', fontSize: 13, fontFamily: 'var(--font-body)', resize: 'none', height: 70, background: 'var(--bg-elevated)', color: 'var(--text-primary)' }} />
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'flex-end' }}>
+            <button onClick={() => setShowQuoteBox(false)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text-secondary)' }}>Cancel</button>
+            <button onClick={() => handleRepost(quoteText)} disabled={reposting}
+              style={{ padding: '6px 16px', borderRadius: 8, border: 'none', background: '#10B981', color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+              {reposting ? '...' : '🔁 Repost'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {showComments && (
         <div style={s.commentsSection}>

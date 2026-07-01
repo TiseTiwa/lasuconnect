@@ -33,6 +33,12 @@ const postSchema = new mongoose.Schema(
     likesCount: { type: Number, default: 0 },
     commentsCount: { type: Number, default: 0 },
     sharesCount: { type: Number, default: 0 },
+    repostOf: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Post',
+      default: null,
+    },
+    isRepost: { type: Boolean, default: false },
     isAnonymous: { type: Boolean, default: false },
     isPinned: { type: Boolean, default: false },
     visibility: {

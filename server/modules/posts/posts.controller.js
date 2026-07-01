@@ -59,6 +59,7 @@ exports.getFeed = catchAsync(async (req, res, next) => {
   const [posts, total] = await Promise.all([
     Post.find(query)
       .populate('author', AUTHOR_SELECT)
+      .populate({ path: 'repostOf', populate: { path: 'author', select: AUTHOR_SELECT } })
       .sort({ isPinned: -1, createdAt: -1 })
       .skip(skip).limit(parseInt(limit)).lean(),
     Post.countDocuments(query),
@@ -216,13 +217,61 @@ exports.toggleCommentLike = catchAsync(async (req, res, next) => {
 //  POST /api/posts/:id/share   ← NEW
 // ────────────────────────────────────────────────────────────
 exports.sharePost = catchAsync(async (req, res, next) => {
-  const post = await Post.findOneAndUpdate(
-    { _id: req.params.id, isDeleted: false },
-    { $inc: { sharesCount: 1 } },
-    { new: true }
-  );
-  if (!post) return next(new AppError('Post not found.', 404));
-  sendSuccess(res, { data: { sharesCount: post.sharesCount || 0 } });
+  const { quote = '' } = req.body; // optional quote text
+  const originalPost = await Post.findOne({ _id: req.params.id, isDeleted: false })
+    .populate('author', AUTHOR_SELECT);
+  if (!originalPost) return next(new AppError('Post not found.', 404));
+
+  // Prevent reposting your own post
+  if (originalPost.author._id.toString() === req.user._id.toString()) {
+    return next(new AppError("You can't repost your own post.", 400));
+  }
+
+  // Check if user already reposted this
+  const alreadyReposted = await Post.findOne({
+    author: req.user._id,
+    repostOf: originalPost._id,
+    isDeleted: false,
+  });
+  if (alreadyReposted) {
+    return next(new AppError('You already reposted this.', 400));
+  }
+
+  // Repost the original (not a repost-of-repost — always reference the root)
+  const rootId = originalPost.isRepost ? originalPost.repostOf : originalPost._id;
+
+  const repost = await Post.create({
+    author:    req.user._id,
+    content:   quote.trim(),          // optional quote text
+    feedType:  originalPost.feedType,
+    visibility:'public',
+    isRepost:  true,
+    repostOf:  rootId,
+    mediaUrls: [],
+    mediaType: 'text',
+  });
+
+  // Increment sharesCount on the original
+  await Post.findByIdAndUpdate(rootId, { $inc: { sharesCount: 1 } });
+
+  await repost.populate('author', AUTHOR_SELECT);
+  await repost.populate({ path: 'repostOf', populate: { path: 'author', select: AUTHOR_SELECT } });
+
+  // Notify original author
+  await createAndEmit({
+    io:          req.io,
+    recipientId: originalPost.author._id,
+    actorId:     req.user._id,
+    type:        'repost',
+    targetModel: 'Post',
+    targetId:    originalPost._id,
+    message:     `${req.user.fullName} reposted your post`,
+  });
+
+  sendSuccess(res, {
+    statusCode: 201,
+    data: { repost: formatPost(repost, req.user._id), sharesCount: (originalPost.sharesCount || 0) + 1 },
+  });
 });
 
 // ────────────────────────────────────────────────────────────
