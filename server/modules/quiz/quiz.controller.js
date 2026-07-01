@@ -13,6 +13,20 @@ const yesterdayStr = () => {
   return d.toISOString().slice(0, 10);
 };
 
+// ── Shuffle helper ────────────────────────────────────────
+const shuffleOptions = (options, correctIndex) => {
+  // Create indexed array, shuffle, rebuild with new correct index
+  const indexed = options.map((opt, i) => ({ opt, isCorrect: i === correctIndex }));
+  for (let i = indexed.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indexed[i], indexed[j]] = [indexed[j], indexed[i]];
+  }
+  return {
+    options:      indexed.map(x => x.opt),
+    correctIndex: indexed.findIndex(x => x.isCorrect),
+  };
+};
+
 // ── AI question generation (lazy init — no crash if key missing) ──
 const generateAIQuestions = async (courseCode, courseTitle, count = 2) => {
   try {
@@ -20,66 +34,115 @@ const generateAIQuestions = async (courseCode, courseTitle, count = 2) => {
       console.log('No ANTHROPIC_API_KEY — skipping AI generation');
       return [];
     }
-    // Lazy require so module loads fine without the key
     const Anthropic = require('@anthropic-ai/sdk');
     const client    = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const response = await client.messages.create({
-      model:      'claude-sonnet-4-6',
-      max_tokens: 1500,
+      model:      'claude-haiku-4-5-20251001',
+      max_tokens: 2000,
       messages: [{
         role: 'user',
-        content: `Generate ${count} multiple-choice quiz questions for a Nigerian university undergraduate course.
-Course: ${courseTitle} (${courseCode})
+        content: `You are a Nigerian university lecturer creating a multiple-choice quiz.
 
-Return ONLY valid JSON, no markdown:
-{"questions":[{"question":"What is ...","options":["A","B","C","D"],"correctIndex":0,"explanation":"Brief reason","difficulty":"medium"}]}
+Generate ${count} challenging questions for: ${courseTitle} (${courseCode})
 
-Rules: 4 options, correctIndex 0-3, Nigerian university context, factual and clear.`,
+CRITICAL RULES:
+- The correct answer MUST be placed at DIFFERENT positions — do NOT always use index 0
+- Use index 0, 1, 2, or 3 randomly and vary them across questions
+- Questions must test real understanding, not just recall
+- Make distractors (wrong answers) plausible, not obviously wrong
+- Nigerian university context and curriculum
+
+Return ONLY this exact JSON structure, no markdown, no extra text:
+{
+  "questions": [
+    {
+      "question": "Full question text here?",
+      "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
+      "correctIndex": 2,
+      "explanation": "Brief explanation of why this is correct",
+      "difficulty": "medium"
+    }
+  ]
+}
+
+IMPORTANT: correctIndex must be the integer position (0-3) of the correct answer in the options array. Vary it — do not always use 0.`,
       }],
     });
 
     const text  = response.content[0]?.text || '';
-    const clean = text.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean).questions || [];
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return [];
+    const parsed = JSON.parse(match[0]);
+    const questions = parsed.questions || [];
+
+    // Shuffle options server-side as an extra safety net
+    return questions.map(q => {
+      const { options, correctIndex } = shuffleOptions(q.options, q.correctIndex);
+      return { ...q, options, correctIndex };
+    });
   } catch (err) {
     console.error('AI question error:', err.message);
     return [];
   }
 };
 
-// ── Fallback question bank (generic CS/university questions) ──
+// ── Fallback question bank ────────────────────────────────
 const getFallbackQuestion = (courseCode, courseTitle) => {
   const dept = courseCode.replace(/\d+/g, '').toUpperCase();
 
   const generic = {
     CSC: [
-      { question: `Which of the following best describes the primary function of an operating system in computer science?`, options: ['Managing hardware and software resources', 'Writing application code', 'Designing user interfaces', 'Storing data in databases'], correctIndex: 0, explanation: 'An OS manages hardware/software resources and provides services for programs.', difficulty: 'easy' },
-      { question: `What does the acronym "SQL" stand for in database management?`, options: ['Structured Query Language', 'Simple Question Logic', 'Sequential Queue Language', 'Standard Query Library'], correctIndex: 0, explanation: 'SQL stands for Structured Query Language, used to manage relational databases.', difficulty: 'easy' },
-      { question: `In object-oriented programming, what is "inheritance"?`, options: ['A class acquiring properties of another class', 'Hiding internal implementation details', 'Defining multiple methods with the same name', 'Converting data between types'], correctIndex: 0, explanation: 'Inheritance allows a class to derive properties and behaviours from a parent class.', difficulty: 'medium' },
-      { question: `What is the time complexity of binary search on a sorted array?`, options: ['O(log n)', 'O(n)', 'O(n²)', 'O(1)'], correctIndex: 0, explanation: 'Binary search halves the search space each step, giving O(log n) complexity.', difficulty: 'medium' },
-      { question: `Which data structure operates on a Last-In-First-Out (LIFO) principle?`, options: ['Stack', 'Queue', 'Linked List', 'Tree'], correctIndex: 0, explanation: 'A stack uses LIFO — the last element added is the first one removed.', difficulty: 'easy' },
+      { question: 'Which data structure operates on a Last-In-First-Out (LIFO) principle?', options: ['Queue', 'Stack', 'Linked List', 'Tree'], correctIndex: 1, explanation: 'A stack uses LIFO — the last element added is the first one removed.', difficulty: 'easy' },
+      { question: 'What is the time complexity of binary search on a sorted array?', options: ['O(n)', 'O(n²)', 'O(log n)', 'O(1)'], correctIndex: 2, explanation: 'Binary search halves the search space each step, giving O(log n) complexity.', difficulty: 'medium' },
+      { question: 'In object-oriented programming, what does "encapsulation" mean?', options: ['Inheriting properties from a parent class', 'Defining multiple methods with the same name', 'Bundling data and methods that operate on that data within a class', 'Converting one data type to another'], correctIndex: 2, explanation: 'Encapsulation bundles related data and behaviour together and hides internal details.', difficulty: 'medium' },
+      { question: 'What does SQL stand for?', options: ['Simple Question Logic', 'Sequential Queue Language', 'Standard Query Library', 'Structured Query Language'], correctIndex: 3, explanation: 'SQL stands for Structured Query Language, used to manage relational databases.', difficulty: 'easy' },
+      { question: 'Which of the following is NOT a characteristic of an algorithm?', options: ['Finiteness', 'Definiteness', 'Randomness', 'Effectiveness'], correctIndex: 2, explanation: 'Algorithms must be finite, definite, and effective. Randomness is not a required characteristic.', difficulty: 'medium' },
     ],
     MAT: [
-      { question: `What is the derivative of sin(x)?`, options: ['cos(x)', '-cos(x)', 'tan(x)', '-sin(x)'], correctIndex: 0, explanation: 'The derivative of sin(x) is cos(x).', difficulty: 'easy' },
-      { question: `Which of these is a prime number?`, options: ['17', '15', '21', '25'], correctIndex: 0, explanation: '17 is prime; 15=3×5, 21=3×7, 25=5×5.', difficulty: 'easy' },
+      { question: 'What is the derivative of sin(x)?', options: ['-sin(x)', '-cos(x)', 'tan(x)', 'cos(x)'], correctIndex: 3, explanation: 'The derivative of sin(x) is cos(x).', difficulty: 'easy' },
+      { question: 'Which of these is a prime number?', options: ['15', '21', '17', '25'], correctIndex: 2, explanation: '17 is prime; 15=3×5, 21=3×7, 25=5×5.', difficulty: 'easy' },
+      { question: 'What is the value of log₁₀(1000)?', options: ['2', '4', '1', '3'], correctIndex: 3, explanation: 'log₁₀(1000) = log₁₀(10³) = 3.', difficulty: 'easy' },
     ],
     PHY: [
-      { question: `What is Newton's second law of motion?`, options: ['F = ma', 'F = mv', 'E = mc²', 'v = u + at'], correctIndex: 0, explanation: 'Force equals mass times acceleration (F = ma).', difficulty: 'easy' },
+      { question: 'Which formula correctly states Newton\'s second law of motion?', options: ['E = mc²', 'v = u + at', 'F = mv', 'F = ma'], correctIndex: 3, explanation: 'Force equals mass times acceleration (F = ma).', difficulty: 'easy' },
+      { question: 'What is the SI unit of electric current?', options: ['Volt', 'Ampere', 'Ohm', 'Watt'], correctIndex: 1, explanation: 'The SI unit of electric current is the Ampere (A).', difficulty: 'easy' },
+    ],
+    CHM: [
+      { question: 'What is the atomic number of Carbon?', options: ['8', '6', '12', '14'], correctIndex: 1, explanation: 'Carbon has atomic number 6, meaning it has 6 protons in its nucleus.', difficulty: 'easy' },
+      { question: 'Which type of bond involves the sharing of electrons between atoms?', options: ['Ionic bond', 'Metallic bond', 'Covalent bond', 'Hydrogen bond'], correctIndex: 2, explanation: 'Covalent bonds involve the sharing of electron pairs between atoms.', difficulty: 'easy' },
+    ],
+    BIO: [
+      { question: 'Which organelle is known as the "powerhouse of the cell"?', options: ['Nucleus', 'Ribosome', 'Mitochondria', 'Golgi apparatus'], correctIndex: 2, explanation: 'Mitochondria produce ATP through cellular respiration, earning the "powerhouse" name.', difficulty: 'easy' },
+      { question: 'What process do plants use to make food using sunlight?', options: ['Respiration', 'Fermentation', 'Transpiration', 'Photosynthesis'], correctIndex: 3, explanation: 'Photosynthesis converts light energy into chemical energy stored as glucose.', difficulty: 'easy' },
     ],
     GNS: [
-      { question: `What does "plagiarism" mean in academic writing?`, options: ['Using someone else\'s work without credit', 'Citing too many sources', 'Writing in passive voice', 'Using long sentences'], correctIndex: 0, explanation: 'Plagiarism is presenting someone else\'s work or ideas as your own without proper attribution.', difficulty: 'easy' },
+      { question: 'What does "plagiarism" mean in academic writing?', options: ['Citing too many sources', 'Writing in passive voice', 'Using someone else\'s work without credit', 'Using long sentences'], correctIndex: 2, explanation: 'Plagiarism is presenting someone else\'s work or ideas as your own without proper attribution.', difficulty: 'easy' },
+      { question: 'Which of the following is a characteristic of effective communication?', options: ['Ambiguity', 'Verbosity', 'Clarity', 'Complexity'], correctIndex: 2, explanation: 'Effective communication is clear, concise, and unambiguous.', difficulty: 'easy' },
     ],
     ENT: [
-      { question: `What is the primary goal of entrepreneurship?`, options: ['Creating value through innovation and risk-taking', 'Maximising government revenue', 'Minimising employee salaries', 'Avoiding market competition'], correctIndex: 0, explanation: 'Entrepreneurship involves creating economic and social value through innovation.', difficulty: 'easy' },
+      { question: 'What is the primary goal of entrepreneurship?', options: ['Maximising government revenue', 'Creating value through innovation and risk-taking', 'Minimising employee salaries', 'Avoiding market competition'], correctIndex: 1, explanation: 'Entrepreneurship involves creating economic and social value through innovation.', difficulty: 'easy' },
+    ],
+    ECO: [
+      { question: 'What does "GDP" stand for in economics?', options: ['Gross Domestic Product', 'General Development Plan', 'Government Deficit Payment', 'Gross Distribution Price'], correctIndex: 0, explanation: 'GDP (Gross Domestic Product) measures the total value of goods and services produced in a country.', difficulty: 'easy' },
+      { question: 'According to the law of demand, when price increases, what happens to quantity demanded?', options: ['It decreases', 'It increases', 'It stays the same', 'It doubles'], correctIndex: 0, explanation: 'The law of demand states that as price rises, quantity demanded falls, all else equal.', difficulty: 'easy' },
+    ],
+    ACC: [
+      { question: 'What is the accounting equation?', options: ['Revenue = Expenses + Profit', 'Assets = Liabilities - Equity', 'Assets = Liabilities + Equity', 'Profit = Revenue × Expenses'], correctIndex: 2, explanation: 'The fundamental accounting equation is: Assets = Liabilities + Equity.', difficulty: 'easy' },
+    ],
+    LAW: [
+      { question: 'What is the Latin term for "let the decision stand" in legal precedent?', options: ['Habeas corpus', 'Stare decisis', 'Prima facie', 'Mens rea'], correctIndex: 1, explanation: '"Stare decisis" means courts should follow prior decisions when the same issues arise.', difficulty: 'medium' },
     ],
   };
 
   const pool = generic[dept] || [
-    { question: `Which of the following best describes the study of ${courseTitle}?`, options: ['A systematic field with defined principles', 'An informal collection of opinions', 'A purely practical skill with no theory', 'An ancient discipline with no modern relevance'], correctIndex: 0, explanation: `${courseTitle} is a structured academic discipline with established principles and methodologies.`, difficulty: 'easy' },
+    { question: `Which statement best describes ${courseTitle} as an academic discipline?`, options: ['A purely practical skill with no theoretical basis', 'An ancient discipline with no modern relevance', 'An informal collection of unverified opinions', 'A systematic field with defined principles and methodologies'], correctIndex: 3, explanation: `${courseTitle} is a structured academic discipline with established principles and methodologies.`, difficulty: 'easy' },
   ];
 
-  return pool[Math.floor(Math.random() * pool.length)];
+  // Pick random question from pool then shuffle its options
+  const base = pool[Math.floor(Math.random() * pool.length)];
+  const { options, correctIndex } = shuffleOptions(base.options, base.correctIndex);
+  return { ...base, options, correctIndex };
 };
 
 // ── Core: get or create today's quiz ─────────────────────
