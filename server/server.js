@@ -43,6 +43,8 @@ const server = http.createServer(app); // ← consistent name throughout
 // ── Allowed origins ───────────────────────────────────────
 const allowedOrigins = [
   process.env.CLIENT_URL,
+  "https://lasuconnect.vercel.app",
+  "https://lasuconnect-git-main-ismail-timileyins-projects.vercel.app",
   "http://localhost:5173",
   "http://localhost:5174",
   "http://localhost:5175",
