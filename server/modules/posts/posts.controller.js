@@ -193,6 +193,7 @@ exports.getUserPosts = catchAsync(async (req, res, next) => {
   const [posts, total] = await Promise.all([
     Post.find({ author: targetUser._id, isDeleted: false, visibility: 'public' })
       .populate('author', AUTHOR_SELECT)
+      .populate({ path: 'repostOf', populate: { path: 'author', select: AUTHOR_SELECT } })
       .sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)).lean(),
     Post.countDocuments({ author: targetUser._id, isDeleted: false, visibility: 'public' }),
   ]);

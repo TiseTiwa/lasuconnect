@@ -179,8 +179,9 @@ const FieldInput = ({ label, name, value, onChange, hint, prefix }) => (
 // ── Post Mini Card ─────────────────────────────────────────
 const PostMiniCard = ({ post, profile }) => {
   const navigate = useNavigate();
-  const hasMedia  = post.mediaUrls?.length > 0;
+  const hasMedia   = post.mediaUrls?.length > 0;
   const isAcademic = post.feedType === 'academic';
+  const original   = post.isRepost ? post.repostOf : null;
 
   return (
     <div onClick={() => navigate(`/post/${post._id}`)}
@@ -188,14 +189,21 @@ const PostMiniCard = ({ post, profile }) => {
       onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'}
       onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
     >
-      {/* Media first (if present) */}
-      {hasMedia && (
+      {/* Media first (if present and not a repost) */}
+      {hasMedia && !post.isRepost && (
         <div style={{ width: '100%', height: 180, overflow: 'hidden', background: '#0F172A' }}>
           <img src={post.mediaUrls[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
         </div>
       )}
 
       <div style={{ padding: '12px 14px' }}>
+        {/* Repost header */}
+        {post.isRepost && (
+          <div style={{ fontSize: 11, color: 'var(--text-tertiary, #94A3B8)', fontWeight: 600, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+            🔁 {profile?.fullName?.split(' ')[0]} reposted
+          </div>
+        )}
+
         {/* Author row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <div style={{ width: 30, height: 30, borderRadius: '50%', background: getColor(profile?.username || ''), display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 11, fontWeight: 700, overflow: 'hidden', flexShrink: 0 }}>
@@ -214,8 +222,38 @@ const PostMiniCard = ({ post, profile }) => {
           </span>
         </div>
 
-        {/* Content */}
-        {post.content && (
+        {/* Quote text (repost with added comment) */}
+        {post.isRepost && post.content && (
+          <p style={{ fontSize: 13.5, color: 'var(--text-primary, #1E293B)', lineHeight: 1.6, margin: '0 0 10px' }}>
+            {post.content}
+          </p>
+        )}
+
+        {/* Embedded original post */}
+        {original && (
+          <div style={{ border: '1.5px solid var(--border, #E2E8F0)', borderRadius: 10, padding: '10px 12px', background: 'var(--bg-elevated, #F8FAFC)', marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', background: getColor(original.author?.username || ''), display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 9, fontWeight: 700, overflow: 'hidden', flexShrink: 0 }}>
+                {original.author?.avatarUrl
+                  ? <img src={original.author.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : getInitials(original.author?.fullName || '')}
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary, #0F172A)', fontFamily: 'Geist, sans-serif' }}>{original.author?.fullName}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-tertiary, #94A3B8)' }}>@{original.author?.username}</span>
+            </div>
+            {original.content && (
+              <p style={{ fontSize: 13, color: 'var(--text-secondary, #374151)', lineHeight: 1.5, margin: 0, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                {original.content}
+              </p>
+            )}
+            {original.mediaUrls?.[0] && (
+              <img src={original.mediaUrls[0]} alt="" style={{ width: '100%', maxHeight: 140, objectFit: 'cover', borderRadius: 8, marginTop: 8 }} />
+            )}
+          </div>
+        )}
+
+        {/* Regular post content */}
+        {!post.isRepost && post.content && (
           <p style={{ fontSize: 13.5, color: 'var(--text-primary, #1E293B)', lineHeight: 1.6, margin: '0 0 10px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
             {post.content}
           </p>
