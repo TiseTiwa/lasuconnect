@@ -275,20 +275,26 @@ const BroadcasterView = ({ stream, currentUser, socket, onEnd }) => {
       socket?.emit('stream:host', { streamId: stream._id, userId: currentUser._id });
 
       // Start MediaRecorder — send chunks via socket
-      const recorder = new MediaRecorder(mediaStream, {
-        mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm',
-      });
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+        ? 'video/webm;codecs=vp8,opus'
+        : MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : 'video/webm';
+
+      const recorder = new MediaRecorder(mediaStream, { mimeType });
 
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0 && socket) {
-          // Convert blob to ArrayBuffer for socket transmission
           e.data.arrayBuffer().then(buffer => {
-            socket.emit('stream:chunk', { streamId: stream._id, chunk: buffer });
+            socket.emit('stream:chunk', {
+              streamId: stream._id,
+              chunk: new Uint8Array(buffer), // Uint8Array transmits as binary reliably
+            });
           });
         }
       };
 
-      recorder.start(500); // send chunk every 500ms
+      recorder.start(250); // 250ms chunks — smaller, more frequent, less likely to exceed buffer limit
       recorderRef.current = recorder;
       setIsLive(true);
     } catch (err) {
@@ -413,7 +419,15 @@ const ViewerView = ({ stream, currentUser, socket, onLeave }) => {
   const [buffering, setBuffering]     = useState(true);
   const [error, setError]             = useState('');
 
-  const appendBuffer = useCallback((buffer) => {
+  const toArrayBuffer = (chunk) => {
+    if (chunk instanceof ArrayBuffer) return chunk;
+    if (chunk instanceof Uint8Array) return chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength);
+    if (Array.isArray(chunk)) return new Uint8Array(chunk).buffer;
+    return new Uint8Array(Object.values(chunk)).buffer;
+  };
+
+  const appendBuffer = useCallback((chunk) => {
+    const buffer = toArrayBuffer(chunk);
     const sb = sourceBufferRef.current;
     if (!sb || !sbReadyRef.current) { preQueueRef.current.push(buffer); return; }
     if (sb.updating || queueRef.current.length > 0) {
@@ -478,15 +492,8 @@ const ViewerView = ({ stream, currentUser, socket, onLeave }) => {
     if (!socket) return;
 
     // init segment sent by server when a late viewer joins
-    const onInit = ({ chunk }) => {
-      const buffer = chunk instanceof ArrayBuffer ? chunk : new Uint8Array(chunk).buffer;
-      appendBuffer(buffer);
-    };
-
-    const onChunk = ({ chunk }) => {
-      const buffer = chunk instanceof ArrayBuffer ? chunk : new Uint8Array(chunk).buffer;
-      appendBuffer(buffer);
-    };
+    const onInit = ({ chunk }) => appendBuffer(chunk);
+    const onChunk = ({ chunk }) => appendBuffer(chunk);
 
     const onViewerCount = ({ viewerCount: vc }) => setViewerCount(vc);
 

@@ -60,12 +60,13 @@ app.use(
 
 // ── Socket.IO ─────────────────────────────────────────────
 const io = new Server(server, {
-  // ← was httpServer, now matches const above
   cors: {
     origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
+  maxHttpBufferSize: 5 * 1024 * 1024, // 5MB — allows video chunks up to 5MB
+  transports: ["websocket", "polling"],
 });
 
 // Attach io to every request so controllers can emit events
