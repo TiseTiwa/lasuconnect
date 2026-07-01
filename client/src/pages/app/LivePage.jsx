@@ -235,7 +235,7 @@ const LiveKitVideoGrid = ({ isHost }) => {
   const tracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: false },
      { source: Track.Source.ScreenShare, withPlaceholder: false }],
-    { onlySubscribed: !isHost }  // host sees own local track; viewers only see subscribed tracks
+    { onlySubscribed: false }  // false = return all published tracks (correct for both host and viewer)
   );
 
   if (tracks.length === 0) {
@@ -277,7 +277,11 @@ const LiveKitStreamRoom = ({ stream, token, serverUrl, isHost, currentUser, sock
     return () => socket.off('stream:viewer_count', handler);
   }, [socket]);
 
-  const handleDisconnect = async () => {
+  const hasLeftRef = useRef(false); // prevent double-call from button + onDisconnected
+
+  const handleLeaveStream = async () => {
+    if (hasLeftRef.current) return;
+    hasLeftRef.current = true;
     if (isHost) {
       socket?.emit('stream:end', { streamId: stream._id });
       await endStream(stream._id).catch(() => {});
@@ -302,12 +306,12 @@ const LiveKitStreamRoom = ({ stream, token, serverUrl, isHost, currentUser, sock
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ fontFamily: 'Geist, sans-serif', fontWeight: 700, fontSize: 15, color: 'white' }}>{stream.title}</div>
             {isHost ? (
-              <button onClick={handleDisconnect}
+              <button onClick={handleLeaveStream}
                 style={{ padding: '6px 14px', borderRadius: 20, border: 'none', background: '#EF4444', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Geist, sans-serif' }}>
                 ⏹ End
               </button>
             ) : (
-              <button onClick={handleDisconnect}
+              <button onClick={handleLeaveStream}
                 style={{ padding: '6px 14px', borderRadius: 20, border: '1.5px solid rgba(255,255,255,0.3)', background: 'transparent', color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Geist, sans-serif' }}>
                 ← Leave
               </button>
@@ -323,7 +327,7 @@ const LiveKitStreamRoom = ({ stream, token, serverUrl, isHost, currentUser, sock
             connect={true}
             video={isHost}
             audio={isHost}
-            onDisconnected={handleDisconnect}
+            onDisconnected={handleLeaveStream}
             style={{ height: '100%', background: '#0F172A' }}
           >
             <RoomAudioRenderer />
@@ -382,13 +386,18 @@ const BroadcasterView = ({ stream, currentUser, socket, onEnd }) => {
   const handleGoLive = async () => {
     setStarting(true); setError('');
     try {
+      // Check camera/mic permissions first
+      await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then(stream => stream.getTracks().forEach(t => t.stop())) // release immediately, LiveKit will re-acquire
+        .catch(() => { throw new Error('Camera or microphone access denied. Please allow access in your browser settings.'); });
+
       if (stream.status !== 'live') await startStream(stream._id);
       const res = await getLiveKitToken(stream._id);
       socket?.emit('stream:host', { streamId: stream._id, userId: currentUser._id });
       setServerUrl(res.data.data.serverUrl);
       setToken(res.data.data.token);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to start stream.');
+      setError(err.message || err.response?.data?.message || 'Failed to start stream.');
     }
     setStarting(false);
   };
