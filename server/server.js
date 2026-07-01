@@ -41,16 +41,26 @@ const app = express();
 const server = http.createServer(app); // ← consistent name throughout
 
 // ── Allowed origins ───────────────────────────────────────
-const allowedOrigins = [process.env.CLIENT_URL, "http://localhost:5173"].filter(
-  Boolean,
-);
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  "https://lasuconnect.vercel.app",
+  "https://lasuconnect-git-main-ismail-timileyins-projects.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+].filter(Boolean);
 
 // ── CORS (single definition) ──────────────────────────────
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-      else callback(new Error("Not allowed by CORS"));
+      // Allow all localhost origins in dev
+      if (!origin || allowedOrigins.includes(origin) ||
+        (process.env.NODE_ENV === 'development' && origin?.includes('localhost'))) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -60,12 +70,13 @@ app.use(
 
 // ── Socket.IO ─────────────────────────────────────────────
 const io = new Server(server, {
-  // ← was httpServer, now matches const above
   cors: {
     origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
+  maxHttpBufferSize: 5 * 1024 * 1024, // 5MB — allows video chunks up to 5MB
+  transports: ["websocket", "polling"],
 });
 
 // Attach io to every request so controllers can emit events
@@ -89,24 +100,21 @@ app.use(cookieParser());
 if (process.env.NODE_ENV === "development") app.use(morgan("dev"));
 
 // ── Rate limiters ─────────────────────────────────────────
+const isDev = process.env.NODE_ENV === 'development';
+
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
-  message: {
-    success: false,
-    message: "Too many requests. Please try again later.",
-  },
+  max: isDev ? 2000 : 200,
+  message: { success: false, message: "Too many requests. Please try again later." },
+  skip: () => isDev, // skip entirely in dev
 });
 app.use("/api/", limiter);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: {
-    success: false,
-    message:
-      "Too many authentication attempts. Please wait before trying again.",
-  },
+  max: isDev ? 1000 : 20,
+  message: { success: false, message: "Too many authentication attempts. Please wait before trying again." },
+  skip: () => isDev, // skip entirely in dev
 });
 app.use("/api/auth/", authLimiter);
 

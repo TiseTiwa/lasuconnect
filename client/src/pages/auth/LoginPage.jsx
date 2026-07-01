@@ -18,6 +18,7 @@ const LoginPage = () => {
   useEffect(() => {
     localStorage.removeItem('accessToken');
     sessionStorage.removeItem('lc_session');
+    clearError(); // clear any stale error from previous session restore attempt
   }, []);
 
   const handleChange = (e) => {
