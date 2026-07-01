@@ -177,22 +177,60 @@ const FieldInput = ({ label, name, value, onChange, hint, prefix }) => (
 );
 
 // ── Post Mini Card ─────────────────────────────────────────
-const PostMiniCard = ({ post }) => (
-  <div style={s.postCard}>
-    <div style={s.postCardHeader}>
-      <span style={{ ...s.feedTypeBadge, background: post.feedType === "academic" ? "#EFF6FF" : "#F0FDF4", color: post.feedType === "academic" ? "#2563EB" : "#16A34A" }}>
-        {post.feedType === "academic" ? "📚" : "🌐"}
-      </span>
-      <span style={s.postCardTime}>{timeAgo(post.createdAt)}</span>
+const PostMiniCard = ({ post, profile }) => {
+  const navigate = useNavigate();
+  const hasMedia  = post.mediaUrls?.length > 0;
+  const isAcademic = post.feedType === 'academic';
+
+  return (
+    <div onClick={() => navigate(`/post/${post._id}`)}
+      style={{ background: 'var(--bg-surface, white)', borderRadius: 14, border: '1px solid var(--border, #E2E8F0)', overflow: 'hidden', cursor: 'pointer', transition: 'box-shadow 0.15s', fontFamily: "'DM Sans', sans-serif" }}
+      onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'}
+      onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+    >
+      {/* Media first (if present) */}
+      {hasMedia && (
+        <div style={{ width: '100%', height: 180, overflow: 'hidden', background: '#0F172A' }}>
+          <img src={post.mediaUrls[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        </div>
+      )}
+
+      <div style={{ padding: '12px 14px' }}>
+        {/* Author row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <div style={{ width: 30, height: 30, borderRadius: '50%', background: getColor(profile?.username || ''), display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 11, fontWeight: 700, overflow: 'hidden', flexShrink: 0 }}>
+            {profile?.avatarUrl
+              ? <img src={profile.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : getInitials(profile?.fullName || '')}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary, #0F172A)', fontFamily: 'Geist, sans-serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {profile?.fullName}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary, #94A3B8)' }}>{timeAgo(post.createdAt)}</div>
+          </div>
+          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 700, background: isAcademic ? '#EFF6FF' : '#F0FDF4', color: isAcademic ? '#2563EB' : '#16A34A', flexShrink: 0 }}>
+            {isAcademic ? '📚 Academic' : '🌐 Social'}
+          </span>
+        </div>
+
+        {/* Content */}
+        {post.content && (
+          <p style={{ fontSize: 13.5, color: 'var(--text-primary, #1E293B)', lineHeight: 1.6, margin: '0 0 10px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            {post.content}
+          </p>
+        )}
+
+        {/* Stats row */}
+        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--text-tertiary, #94A3B8)', fontWeight: 600, borderTop: '1px solid var(--border, #F1F5F9)', paddingTop: 8 }}>
+          <span>❤️ {post.likesCount || 0}</span>
+          <span>💬 {post.commentsCount || 0}</span>
+          {post.sharesCount > 0 && <span>🔁 {post.sharesCount}</span>}
+        </div>
+      </div>
     </div>
-    <p style={s.postCardContent}>{post.content?.slice(0, 120)}{post.content?.length > 120 ? "..." : ""}</p>
-    {post.mediaUrls?.[0] && <img src={post.mediaUrls[0]} alt="" style={s.postCardImg} />}
-    <div style={s.postCardStats}>
-      <span>❤️ {post.likesCount}</span>
-      <span>💬 {post.commentsCount}</span>
-    </div>
-  </div>
-);
+  );
+};
 
 // ── Users List Modal ───────────────────────────────────────
 const UsersListModal = ({ title, users, onClose }) => {
@@ -511,7 +549,7 @@ const ProfilePage = () => {
                     .filter((p) => activeTab === "academic" ? p.feedType === "academic" : true)
                     .map((post, i) => (
                       <div key={post._id} style={{ animationDelay: `${i * 0.05}s`, animation: "fadeUp 0.3s ease forwards", opacity: 0 }}>
-                        <PostMiniCard post={post} />
+                        <PostMiniCard post={post} profile={profile} />
                       </div>
                     ))}
                 </div>
