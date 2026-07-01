@@ -5,7 +5,12 @@ const commentSchema = new mongoose.Schema(
     post: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Post',
-      required: true,
+      default: null,
+    },
+    reel: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Reel',
+      default: null,
     },
     author: {
       type: mongoose.Schema.Types.ObjectId,
@@ -32,6 +37,7 @@ const commentSchema = new mongoose.Schema(
 );
 
 commentSchema.index({ post: 1, createdAt: 1 });
+commentSchema.index({ reel: 1, createdAt: 1 });
 commentSchema.index({ parentComment: 1 });
 
 commentSchema.pre('save', function (next) {

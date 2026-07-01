@@ -37,11 +37,10 @@ const generateSecureToken = () => {
 // ── Set refresh token as HTTP-only cookie ─────────────────
 const setRefreshTokenCookie = (res, token) => {
   res.cookie('refreshToken', token, {
-    httpOnly: true,       // Not accessible via JS — prevents XSS
+    httpOnly: true,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    secure: process.env.NODE_ENV === 'production', // HTTPS only in prod
-    sameSite: 'strict',   // CSRF protection
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 };
 
@@ -51,8 +50,7 @@ const clearRefreshTokenCookie = (res) => {
     httpOnly: true,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    expires: new Date(0), // Expire immediately
+    expires: new Date(0),
   });
 };
 

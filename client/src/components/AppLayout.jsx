@@ -5,16 +5,50 @@ import { useSocket } from "../context/SocketContext";
 import { useTheme } from "../context/ThemeContext";
 import LCIcon from "./LCIcon";
 import LASULogo from "./LASULogo";
+import { getUnreadCount } from "../services/notificationsService";
+import { getConversations } from "../services/messagesService";
 
 // ── Notification count ─────────────────────────────────────
 const useUnreadCount = (socket) => {
   const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    getUnreadCount()
+      .then(res => setCount(res.data?.data?.count ?? 0))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!socket) return;
     const handler = () => setCount((c) => c + 1);
     socket.on("notification:new", handler);
     return () => socket.off("notification:new", handler);
   }, [socket]);
+
+  return { count, clear: () => setCount(0) };
+};
+
+// ── Unread message count ───────────────────────────────────
+const useUnreadMessages = (socket) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    getConversations()
+      .then(res => {
+        const convs = res.data?.data?.conversations || [];
+        const total = convs.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+        setCount(total);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handler = () => setCount((c) => c + 1);
+    socket.on("message:notification", handler);
+    return () => socket.off("message:notification", handler);
+  }, [socket]);
+
   return { count, clear: () => setCount(0) };
 };
 
@@ -111,11 +145,12 @@ const ModeCard = () => {
 
 // ── Main AppLayout ─────────────────────────────────────────
 const AppLayout = () => {
-  const { user }  = useAuthStore();
+  const { user, logout }  = useAuthStore();
   const socket    = useSocket();
   const navigate  = useNavigate();
   const { mode }  = useTheme();
-  const { count: unreadCount, clear } = useUnreadCount(socket);
+  const { count: unreadCount, clear: clearNotifs }   = useUnreadCount(socket);
+  const { count: unreadMessages, clear: clearMessages } = useUnreadMessages(socket);
   const [showMore, setShowMore] = useState(false);
 
   const isAdmin = ["admin", "super_admin"].includes(user?.role);
@@ -124,8 +159,8 @@ const AppLayout = () => {
     { to: "/",              icon: "home",     label: "Home",     exact: true },
     { to: "/reels",         icon: "reels",    label: "Reels" },
     { to: "/search",        icon: "search",   label: "Search" },
-    { to: "/messages",      icon: "messages", label: "Messages" },
-    { to: "/notifications", icon: "bell",     label: "Alerts",  badge: unreadCount, onTap: clear },
+    { to: "/messages",      icon: "messages", label: "Messages", badge: unreadMessages, onTap: clearMessages },
+    { to: "/notifications", icon: "bell",     label: "Alerts",   badge: unreadCount,    onTap: clearNotifs },
   ];
 
   const SIDEBAR_EXTRA = [
@@ -288,6 +323,16 @@ const AppLayout = () => {
                 </>
               )}
             </NavLink>
+            <button onClick={logout} style={{
+              display: "flex", alignItems: "center", gap: 10,
+              width: "100%", padding: "9px 10px", marginTop: 4,
+              background: "none", border: "none", borderRadius: "var(--radius-md)",
+              cursor: "pointer", color: "#EF4444", fontSize: 13, fontWeight: 600,
+              fontFamily: "var(--font-body)",
+            }}>
+              <LCIcon name="logout" size={18} color="#EF4444" />
+              Sign out
+            </button>
           </div>
         </aside>
 
@@ -422,6 +467,18 @@ const AppLayout = () => {
                 )}
               </NavLink>
             </div>
+            {/* Sign out */}
+            <button onClick={() => { setShowMore(false); logout(); }} style={{
+              display: "flex", alignItems: "center", gap: 12,
+              width: "100%", padding: "12px 14px", marginTop: 8,
+              background: "#FEF2F2", border: "0.5px solid #FECACA",
+              borderRadius: "var(--radius-md)", cursor: "pointer",
+              color: "#EF4444", fontSize: 13, fontWeight: 600,
+              fontFamily: "var(--font-body)",
+            }}>
+              <LCIcon name="logout" size={20} color="#EF4444" />
+              Sign out
+            </button>
           </div>
         </>
       )}

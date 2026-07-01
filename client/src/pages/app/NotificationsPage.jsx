@@ -350,10 +350,12 @@ const NotificationsPage = () => {
 
   const handleNavigate = (notif) => {
     switch (notif.type) {
-      case 'follow': navigate(`/profile/${notif.actors?.[0]?.username || notif.actor?.username}`); break;
-      case 'like': case 'comment': navigate('/'); break;
-      case 'reel_like': case 'reel_comment': navigate('/reels'); break;
-      case 'message': navigate('/messages'); break;
+      case 'follow':       navigate(`/profile/${notif.actors?.[0]?.username || notif.actor?.username}`); break;
+      case 'like':
+      case 'comment':      notif.targetId ? navigate(`/post/${notif.targetId}`) : navigate('/'); break;
+      case 'reel_like':
+      case 'reel_comment': navigate('/reels'); break;
+      case 'message':      navigate('/messages'); break;
       default: break;
     }
   };

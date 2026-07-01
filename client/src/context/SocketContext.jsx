@@ -1,58 +1,51 @@
-import { createContext, useContext, useEffect, useRef } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import useAuthStore from "./useAuthStore";
 
 const SocketContext = createContext(null);
-const socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5000", {
-  withCredentials: true,
-});
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
 
 export const SocketProvider = ({ children }) => {
-  const socketRef = useRef(null);
+  const [socket, setSocket] = useState(null);
   const { user, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
-    // Connect to Socket.IO server
-    socketRef.current = io("/", {
+    const s = io(SOCKET_URL, {
       withCredentials: true,
       autoConnect: true,
     });
 
-    const socket = socketRef.current;
-
-    socket.on("connect", () => {
-      console.log("🔌 Socket connected:", socket.id);
-      // Tell the server which user this socket belongs to
-      socket.emit("user:join", user._id);
+    s.on("connect", () => {
+      console.log("🔌 Socket connected:", s.id);
+      s.emit("user:join", user._id);
     });
 
-    socket.on("disconnect", () => {
+    s.on("disconnect", () => {
       console.log("❌ Socket disconnected");
     });
 
-    socket.on("connect_error", (err) => {
+    s.on("connect_error", (err) => {
       console.error("Socket connection error:", err.message);
     });
 
-    // Cleanup on unmount or when user changes
+    setSocket(s);
+
     return () => {
-      socket.disconnect();
+      s.disconnect();
+      setSocket(null);
     };
   }, [isAuthenticated, user?._id]);
 
   return (
-    <SocketContext.Provider value={socketRef}>
+    <SocketContext.Provider value={socket}>
       {children}
     </SocketContext.Provider>
   );
 };
 
-// Hook to access the socket instance from any component
-export const useSocket = () => {
-  const socketRef = useContext(SocketContext);
-  return socketRef?.current || null;
-};
+export const useSocket = () => useContext(SocketContext);
 
 export default SocketContext;

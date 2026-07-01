@@ -10,6 +10,8 @@ import AppLayout from "./components/AppLayout";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
+import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 
 // App
 import FeedPage from "./pages/app/FeedPage";
@@ -38,9 +40,11 @@ const App = () => {
       <SocketProvider>
         <Routes>
           {/* Public — logged-in users get redirected to / */}
-          <Route path="/login"        element={<PublicRoute><LoginPage /></PublicRoute>} />
-          <Route path="/register"     element={<PublicRoute><RegisterPage /></PublicRoute>} />
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/login"            element={<PublicRoute><LoginPage /></PublicRoute>} />
+          <Route path="/register"         element={<PublicRoute><RegisterPage /></PublicRoute>} />
+          <Route path="/forgot-password"  element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+          <Route path="/reset-password"   element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
+          <Route path="/verify-email"     element={<VerifyEmailPage />} />
 
           {/* Protected — unauthenticated users get redirected to /login */}
           <Route element={<ProtectedRoute />}>

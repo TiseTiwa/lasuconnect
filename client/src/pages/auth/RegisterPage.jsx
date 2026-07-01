@@ -55,14 +55,27 @@ const StepBar = ({ step, total, color }) => (
   </div>
 );
 
+const Eye = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+  </svg>
+);
+const EyeOff = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>
+  </svg>
+);
+
 const RegisterPage = () => {
   const navigate  = useNavigate();
   const isMobile  = useIsMobile();
 
-  const [step, setStep]       = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-  const [success, setSuccess] = useState(false);
+  const [step, setStep]             = useState(1);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState('');
+  const [success, setSuccess]       = useState(false);
+  const [showPass, setShowPass]     = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const [form, setForm] = useState({
     requestedRole: '', fullName: '', email: '', username: '',
@@ -223,7 +236,12 @@ const RegisterPage = () => {
                   Password
                   {form.password && <span style={{ color: strength.color, fontWeight: 700, marginLeft: 8, fontSize: 11 }}>{strength.label}</span>}
                 </label>
-                <input type="password" value={form.password} onChange={e => set('password', e.target.value)} placeholder="Min. 6 characters" style={inputSt} />
+                <div style={{ position: 'relative' }}>
+                  <input type={showPass ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} placeholder="Min. 6 characters" style={{ ...inputSt, paddingRight: 40 }} />
+                  <button type="button" onClick={() => setShowPass(p => !p)} style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#94A3B8', display: 'flex', alignItems: 'center' }}>
+                    {showPass ? <EyeOff /> : <Eye />}
+                  </button>
+                </div>
                 {form.password && (
                   <div style={{ display: 'flex', gap: 3, marginTop: 5 }}>
                     {[1,2,3,4].map(i => <div key={i} style={{ flex: 1, height: 3, borderRadius: 3, background: i <= pwStrength(form.password).score ? pwStrength(form.password).color : '#E2E8F0' }} />)}
@@ -232,8 +250,13 @@ const RegisterPage = () => {
               </div>
               <div>
                 <label style={labelSt}>Confirm Password</label>
-                <input type="password" value={form.confirmPass} onChange={e => set('confirmPass', e.target.value)}
-                  placeholder="Repeat password" style={{ ...inputSt, borderColor: form.confirmPass && form.password !== form.confirmPass ? '#EF4444' : '#E2E8F0' }} />
+                <div style={{ position: 'relative' }}>
+                  <input type={showConfirm ? 'text' : 'password'} value={form.confirmPass} onChange={e => set('confirmPass', e.target.value)}
+                    placeholder="Repeat password" style={{ ...inputSt, paddingRight: 40, borderColor: form.confirmPass && form.password !== form.confirmPass ? '#EF4444' : '#E2E8F0' }} />
+                  <button type="button" onClick={() => setShowConfirm(p => !p)} style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#94A3B8', display: 'flex', alignItems: 'center' }}>
+                    {showConfirm ? <EyeOff /> : <Eye />}
+                  </button>
+                </div>
                 {form.confirmPass && form.password !== form.confirmPass && (
                   <div style={{ fontSize: 12, color: '#EF4444', marginTop: 4 }}>Passwords do not match</div>
                 )}
