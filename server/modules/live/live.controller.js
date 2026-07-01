@@ -3,8 +3,40 @@ const User = require('../../models/User');
 const catchAsync = require('../../utils/catchAsync');
 const AppError = require('../../utils/AppError');
 const { sendSuccess } = require('../../utils/apiResponse');
+const { AccessToken } = require('livekit-server-sdk');
 
 const HOST_SELECT = 'fullName username avatarUrl department faculty role';
+
+// ────────────────────────────────────────────────────────────
+//  GET /api/live/:id/token  — Generate LiveKit access token
+// ────────────────────────────────────────────────────────────
+exports.getLiveKitToken = catchAsync(async (req, res, next) => {
+  const stream = await LiveStream.findById(req.params.id);
+  if (!stream) return next(new AppError('Stream not found.', 404));
+  if (stream.status === 'ended') return next(new AppError('Stream has ended.', 400));
+
+  const isHost = stream.host.toString() === req.user._id.toString();
+  const roomName = `stream-${stream._id}`;
+  const identity = req.user._id.toString();
+  const participantName = req.user.fullName;
+
+  const at = new AccessToken(
+    process.env.LIVEKIT_API_KEY,
+    process.env.LIVEKIT_API_SECRET,
+    { identity, name: participantName, ttl: '4h' }
+  );
+
+  at.addGrant({
+    roomJoin: true,
+    room: roomName,
+    canPublish: isHost,        // only host can publish video/audio
+    canSubscribe: true,        // everyone can watch
+    canPublishData: true,      // everyone can send chat messages
+  });
+
+  const token = await at.toJwt();
+  sendSuccess(res, { data: { token, roomName, serverUrl: process.env.LIVEKIT_URL, isHost } });
+});
 
 // ────────────────────────────────────────────────────────────
 //  GET /api/live

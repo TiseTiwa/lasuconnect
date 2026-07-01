@@ -7,4 +7,5 @@ export const startStream   = (id)          => api.patch(`/live/${id}/start`);
 export const endStream     = (id)          => api.patch(`/live/${id}/end`);
 export const joinStream    = (id)          => api.post(`/live/${id}/join`);
 export const leaveStream   = (id)          => api.post(`/live/${id}/leave`);
-export const deleteStream  = (id)          => api.delete(`/live/${id}`);
+export const deleteStream    = (id)          => api.delete(`/live/${id}`);
+export const getLiveKitToken = (id)          => api.get(`/live/${id}/token`);

@@ -87,21 +87,9 @@ const initSocket = (io) => {
       }
     });
 
-    // ── VIDEO CHUNK RELAY ─────────────────────────────────
-    socket.on('stream:chunk', ({ streamId, chunk }) => {
-      // Accumulate init segment chunks for the first 500ms
-      // This captures the full WebM EBML header + Tracks element
-      if (!initSegments.has(streamId)) {
-        initSegments.set(streamId, []);
-        socket.data.streamStart = Date.now();
-      }
-      const elapsed = Date.now() - (socket.data.streamStart || Date.now());
-      if (elapsed < initDuration) {
-        initSegments.get(streamId).push(chunk);
-      }
-
-      socket.to(`stream:${streamId}`).emit('stream:chunk', { streamId, chunk });
-    });
+    // ── VIDEO CHUNK RELAY (legacy — replaced by LiveKit) ─────
+    // Kept for backward compatibility, no-op for new streams
+    socket.on('stream:chunk', () => {});
 
     // ── LIVE CHAT ─────────────────────────────────────────
     socket.on('stream:chat', ({ streamId, userId, fullName, avatarUrl, message }) => {
